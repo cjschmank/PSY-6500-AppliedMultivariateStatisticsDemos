@@ -1,0 +1,591 @@
+---
+title: "Week 3 - Data Screening and Cleaning Tutorial"
+author: "Professor Christopher J. Schmank"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+#### **Exploratory data analysis (EDA)**
+
+**Remember**: Like in univariate we will **ALWAYS** begin with EDA before checking assumptions, running inferential tests, or statistical models
+
+1. Physically observe raw data (i.e., spreadsheet) [CRUCIAL STEP!]
+1. Compute summary statistics (e.g., means, medians, and standard deviations)
+1. Create and assess data visualizations
+1. Assess specific inferential test assumptions (e.g., Univariate: Outliers, Normality, Linearity; Homoscedasticity; Multivariate Outliers, Normality, Collinearity)
+
+
+#### **Steps to Data Screening and Cleaning**
+
+1. Start with traditional Exploratory Data Analysis 
+    (a) Eyeball Check
+    (b) Data Visualizations 
+    (c) Univariate Statistics Descriptions
+1. Evaluate presence/pattern of missing data and impute data if necessary
+1. Assess linearity and homoscedasticity (i.e., variance sameness assessments)
+1. Assess normality and univariate outliers
+1. Assess/identify multivariate outliers
+1. Assess multicollinearity and singularity
+
+
+#### **Load/Install Required `R Packages`**
+
+```{r, echo = TRUE, warning = FALSE, message = FALSE}
+# install.packages("tidyverse", dependencies = TRUE)
+# install.packages("psych", dependencies = TRUE)
+# install.packages("mice", dependencies = TRUE)
+# install.packages("psych", dependencies = TRUE)
+# install.packages("lmtest", dependencies = TRUE)
+# install.packages("jmv", dependencies = TRUE)
+# install.packages("MVN", dependencies = TRUE)
+# install.packages("naniar", dependencies = TRUE)
+
+library(mice)
+library(naniar)
+library(lmtest)
+library(jmv)
+library(MVN) # Can also use library(mvnormalTest) if installed
+library(psych)
+library(tidyverse)
+```
+
+
+#### **Step 1A: Accuracy of the Data File**
+
+- Open data file in Excel or R; preview variables of interest
+    + Must complete this step carefully---**do not rush!**
+    + Use `View()` function to open data frame in R
+    + Sort ascending/descending for each variable to assess `minimums` and `maximums`; take note of missing data/cases with missingness
+
+#### **General Data Importing Template:**
+
+```{r, eval=FALSE,echo=TRUE}
+dat <- <ImportDataFrame>
+View(dat)
+```
+
+#### **In Your R Environment Run the Following Lines of Code:**
+
+```{r, eval = FALSE, echo=TRUE}
+View(cattell)
+View(attitude)
+View(nhanes)
+```
+
+- What do you make of these data files? 
+- Are they tidy? If not, what would make them tidy?
+- Do any of them have missing data?
+- Would any of them be problematic for EDA? Why or Why not?
+
+#### **Step 1B: Examine Descriptive Statistics**
+
+- We will focus on using the `psych` package 
+    + Produces frequently requested descriptive statistics for psychological or psychometric studies
+    + `describe()` runs descriptive statistics for all variables in data frame at once
+    + `describe_by()` runs descriptive statistics for all variables in data frame at once broken up by grouping variable(s)
+
+#### **Descriptive Statistics Template:**
+
+```{r eval=FALSE,echo=TRUE}
+describe(dat)
+describeBy(dat, group=<GROUP>)
+```
+
+By default `describe()` and `describeBy()` will:
+
+1. Remove missing data listwise --- `na.rm = TRUE`
+1. Calculate skew and kurtosis --- `skew = TRUE`
+1. Calculate the range --- `ranges = TRUE`
+
+#### **`describe()` Function and Output**
+
+Initial EDA should focus on the following for each variable of interest:
+
+1) `Means`
+2) `Standard Deviations`
+3) `Minimums` & `Maximums`
+4) `Sample Sizes` 
+5) `Skewness` & `Kurtosis`
+
+```{r, echo = TRUE}
+describe(attitude)
+describe(nhanes)
+```
+
+
+#### **`describeBy()` Function and Output**
+
+The following data comes from the `datarium` package (`library(datarium)`) and assesses descriptive statistics for the anxiety scores (`t1`) across three groups (`anxiety`)
+
+```{r eval=FALSE, echo=TRUE}
+describeBy(x = t1, 
+           group = group, 
+           data = anxiety,
+           mat = TRUE)
+```
+```{r eval=TRUE, echo=FALSE}
+describeBy(datarium::anxiety$t1, group = datarium::anxiety$group, mat = TRUE)
+```
+
+
+#### **Step 1C: Visualize Variables of Interest**
+
+Generate and assess univariate plots for all continuous variables to be used in the statistical model:
+
+1. Histograms --- useful for looking at the distribution of data
+1. Boxplots --- useful for quick assessment of outliers 
+
+
+#### **Visualization Template:**
+
+```{r eval=FALSE, echo=TRUE}
+ggplot(data = <DATA>, 
+       mapping = aes(<MAPPINGS>)) +
+  <GEOM_FUNCTION>()
+```
+
+
+#### **`ggplot()` Function and Output**
+
+```{r echo = TRUE}
+# Boxplot Visualization
+ggplot(data = attitude,
+       mapping = aes(y = learning)) +
+  geom_boxplot()
+```
+
+```{r echo = TRUE}
+# Histogram Visualization
+ggplot(data = attitude,
+       mapping = aes(x = learning)) +
+  geom_histogram(bins = 8)
+```
+
+#### **Step 2: Missing Data Analysis**
+
+**Evaluation of Missing Data: Amount and Pattern**
+
+```{r echo=TRUE}
+# Calculate Amount of Missing Data
+sum(is.na(nhanes))/prod(dim(nhanes))
+```
+
+```{r echo=TRUE}
+# Generate Missing Data Pattern
+md.pattern(nhanes)
+
+# This pattern indicates that there are 7 distinct patterns of missingness
+# 13 participants have no missing data at all
+# 3 participants are only missing cholesterol data
+# 1 participant is missing BMI data
+# 1 participant is missing a value for `hyp` and BMI 
+# 7 participants are missing all variables except for age
+
+```
+
+```{r echo=TRUE}
+# Statistical test of Missingness Completely at Random 
+mcar_test(nhanes)
+```
+
+```{r echo=TRUE}
+# Use the `mice()` function to impute missing data
+imp_dat <- mice(nhanes, 
+                maxit = 100, 
+                m = 2, 
+                seed = 13, 
+                method = "pmm", 
+                print=FALSE)
+# `maxit = ` is the number of iterations conducted (default = 5)
+# `m =` the number of imputed data sets created (default = 5)
+# `seed =` IMPORTANT: Allows for replicable imputations (default = NA)
+# `method =` what type of imputation method is used --- see documentation
+# `print = FALSE` code runs but no output listed
+
+# Can visualize the imputed data using `stripplot()`
+# Important to ensure that no imputed data falls outside sampled data!!
+stripplot(imp_dat, 
+          pch = 19, 
+          xlab = "Imputation Number")
+
+```
+
+```{r echo=TRUE}
+# `complete()` function can be used to pull a specific imputation dataset (default = 1)
+dat_imp1 <- complete(imp_dat, action = 1)
+dat_imp2 <- complete(imp_dat, action = 2)
+
+# Can check the pattern of missingness again to show that missingness has been imputed
+md.pattern(dat_imp1)
+md.pattern(dat_imp2)
+
+# Can assess redundancy of data sets using correlation coefficient (> .70 is good news!)
+cor(dat_imp1$bmi,dat_imp2$bmi)
+cor(dat_imp1$hyp,dat_imp2$hyp)
+cor(dat_imp1$chl,dat_imp2$chl)
+```
+
+Once data has been imputed you would choose an imputed data set to use throughout the remainder of the statistical analyses---always important to run data with missing values as well (if possible) to see how interpretation changes after imputation!
+
+
+#### **Step 3A: Check Linearity**
+
+Best way to assess **linearity** is: 
+
+- Correlation Matrix & Scatterplots  
+
+#### **Correlation Matrix**
+
+```{r echo = TRUE}
+corrMatrix(attitude[1:3])
+```
+
+#### **Scatterplot Template and Output**
+
+```{r eval = FALSE, echo = TRUE}
+
+ggplot(data = <DATA>, 
+       mapping = aes(x = <X Variable>,
+                     y = <Y Variable>)) + 
+  geom_point()
+
+```
+
+
+```{r, echo = TRUE}
+# Scatterplot of Ratings x Complaints
+ggplot(data = attitude, 
+       mapping = aes(x = complaints,
+                     y = rating)) + 
+  geom_point()
+
+# Scatterplot of Ratings x Privileges
+ggplot(data = attitude, 
+       mapping = aes(x = privileges,
+                     y = rating)) + 
+  geom_point()
+
+# Scatterplot of Privileges x Complaints
+ggplot(data = attitude, 
+       mapping = aes(x = complaints,
+                     y = privileges)) + 
+  geom_point()
+```
+
+
+#### **Step 3B: Check Homoscedasticity**
+
+Best way to assess **homoscedasticity** is:
+
+- Breusch-Pagan and Studentized Breusch Pagan Tests
+
+#### **Breusch-Pagan and Non-Constant Variance Test Template**
+
+```{r eval = FALSE, echo = TRUE}
+# Create Linear Model
+lm_model <- lm(dat$DV ~ dat$Predictor1 + dat$Predictor2 + ... 
+           + dat$PredictorK)
+
+#Breusch-Pagan Test
+bptest(lm_model, varformula = ~fitted.values(lm_model), stdentize=FALSE)
+
+# Studentized Breusch-Pagan Test is a more conservative option
+bptest(lm_model, varformula = ~fitted.values(lm_model), stdentize=TRUE)
+```
+
+**Want the significance of these tests to be NON-STATISTICALLY significant** ($p > .05$)
+
+```{r echo = TRUE}
+# Generates a linear model predicting attitude ratings from complaints and privilege data
+bplm <- lm(rating~complaints+privileges, data = attitude)
+
+#Breusch-Pagan Test
+bptest(bplm, varformula = ~ fitted.values(bplm), studentize=FALSE)
+#Breusch-Pagan Test (Studentized)
+bptest(bplm, varformula = ~ fitted.values(bplm), studentize=TRUE)
+```
+
+
+#### **Step 4A: Identify Univariate Outliers**
+
+#### **Univariate Outlier Template**
+
+```{r eval = FALSE, echo=TRUE}
+#Counts number of values greater than z = +/-3.29, p = .001
+data[abs(scale(data$IvK)) > 3.29, ]
+
+#Following code removes any univariate outliers from data with
+data_no_uni_outliers <- data[!abs(scale(data$IvK)) > 3.29, ]
+```
+
+```{r echo = TRUE}
+# Will want to run this for ALL variables to be entered into statistical model
+attitude[abs(scale(attitude$rating)) > 3.29, ]
+attitude[abs(scale(attitude$complaints)) > 3.29, ]
+attitude[abs(scale(attitude$privileges)) > 3.29, ]
+
+# No univariate outliers present for these three variables
+```
+
+#### **Step 4B: Assess Univariate Normality**
+
+Best ways to assess univariate normality is:
+
+- Check histograms and box-plot visualizations
+- Assess levels of skewness/kurtosis
+    - Skewness values more extreme than $\pm 3.00$ (Liberal) OR $\pm 1.00$ (Conservative)
+    - Kurtosis values more extreme than $\pm 10.00$ (Liberal) OR $\pm 1.00$ (Conservative)
+
+Can also use a statistical test and additional visualizations
+
+- Shapiro-Wilks' test
+- Q-Q Plots
+
+#### **Shapiro-Wilks and Q-Q Plot Template**
+
+```{r eval = FALSE, echo = TRUE}
+shapiro.test(x)
+qqnorm(x)
+qqline(x)
+```
+
+
+```{r echo = TRUE}
+qqnorm(attitude$rating)
+qqline(attitude$rating)
+
+qqnorm(attitude$complaints)
+qqline(attitude$complaints)
+
+qqnorm(attitude$privileges)
+qqline(attitude$privileges)
+
+shapiro.test(attitude$rating)
+shapiro.test(attitude$complaints)
+shapiro.test(attitude$privileges)
+```
+
+**Want the significance of this test to be NON-STATISTICALLY significant** ($p > .05$)
+
+#### **Step 4C: Assess Multivariate Normality**
+
+Best way to assess multivariate normality is:
+
+- Statistical test triangulation
+- Assessment of Residual Plots and Multivariate Q-Q plots
+
+#### **Multivariate Normality Statistical Test template**
+
+```{r eval = FALSE, echo = TRUE}
+# Mardia's Test of Multivariate Normality
+mardia <- mvn(data,
+              mvnTest = "mardia",
+              desc = FALSE)
+
+# Henze-Zirkler's Test of Multivariate Normality
+hz <- mvn(data,
+          mvnTest = "hz",
+          desc = FALSE)
+
+# Energy Test of Multivariate Normality
+energy <- mvn(data,
+              mvnTest = "energy",
+              desc = FALSE)
+
+# Doornik-Hansen's Test of Multivariate Normality
+dh <- mvn(data,
+          mvnTest = "dh",
+          desc = FALSE)
+
+mardia$multivariateNormality
+hz$multivariateNormality
+energy$multivariateNormality
+dh$multivariateNormality
+```
+
+```{r echo = TRUE}
+# Mardia's Test of Multivariate Normality
+mardia <- mvn(attitude[1:3],
+              mvnTest = "mardia",
+              desc = FALSE)
+
+# Henze-Zirkler's Test of Multivariate Normality
+hz <- mvn(attitude[1:3],
+          mvnTest = "hz",
+          desc = FALSE)
+
+# Energy Test of Multivariate Normality
+energy <- mvn(attitude[1:3],
+              mvnTest = "energy",
+              desc = FALSE)
+
+# Doornik-Hansen's Test of Multivariate Normality
+dh <- mvn(attitude[1:3],
+          mvnTest = "dh",
+          desc = FALSE)
+
+mardia$multivariateNormality
+hz$multivariateNormality
+energy$multivariateNormality
+dh$multivariateNormality
+```
+
+**Want the significance of this test to be NON-STATISTICALLY significant** ($p > .05$)
+
+#### **Residual and Q-Q plot template**
+
+```{r eval=FALSE, echo=TRUE}
+
+MNlm <- linReg(data = data, 
+               dep = <DV>, 
+               covs = c('IV1', 'IV2',..., 'IVK'), 
+               blocks = list(
+                 list('IV1', 'IV2',..., 'IVK')), 
+               r = FALSE,
+               r2 = FALSE,
+               resPlots = TRUE,
+               qqPlot = TRUE) 
+
+MNlm
+```
+
+```{r echo=TRUE}
+MNlm <- linReg(data = attitude, 
+               dep = 'rating',
+               covs = c('complaints','privileges'),
+               blocks = list(
+                 list('complaints','privileges')), 
+               r = FALSE,
+               r2 = FALSE,
+               resPlots = TRUE,
+               qqPlot = TRUE) 
+
+MNlm
+```
+
+
+#### **Step 5: Statistical Identification of Multivariate Outliers**
+
+Two statistical assessments can be used to asses multivariate outliers
+
+- Malhalanobis Distance
+- Cook's Distance
+
+#### **Multivariate Outlier Assessment template**
+
+```{r eval=FALSE,echo=TRUE}
+# Generate Mahalanobis Distance Values
+data$mahal <- outlier(data)
+
+# Compare Standardized Mahalanobis Distance Values to 3.29
+data[abs(scale(data$mahal)) > 3.29] 
+
+# Cook's Distance
+model_cook <- lm(dat$DV ~ dat$Predictor1 + dat$Predictor2 + ...
+                 + dat$PredictorK)
+
+data$cook <- cooks.distance(model_cook)
+
+# Compare Standardized Cooks Distance Values to 3.29
+data[abs(scale(data$cook)) > 3.29] 
+
+```
+
+```{r echo=TRUE}
+# Generate Mahalanobis Distance Values
+attitude$mahal <- outlier(attitude[1:3])
+
+# Compare Standardized Mahalanobis Distance Values to 3.29
+attitude[abs(scale(attitude$mahal)) > 3.29]
+
+# Generate Cook's Distance Values
+CDlm <- lm(rating~complaints+privileges, data = attitude)
+attitude$cook <- cooks.distance(CDlm)
+
+# Compare Standardized Cooks Distance Values to 3.29
+attitude[abs(scale(attitude$cook)) > 3.29] 
+```
+
+#### **Step 6: Assess Multicollinearity and Singularity**
+
+Best way to assess Multicollinearity and Singularity:
+
+- Bivariate Correlations
+- VIF and Tolerance
+- Determinant
+
+#### **VIF and Tolerance Template**
+
+```{r eval=FALSE,echo=TRUE}
+MCvif <- linReg(data = dat,
+                dep = <DV>,
+                covs = c('IV1', 'IV2',..., 'IVK'),
+                blocks = list(
+                  list('IV1', 'IV2',..., 'IVK')),
+                r = FALSE,
+                r2 = FALSE,
+                collin = TRUE)
+MCvif
+```
+
+```{r echo=TRUE}
+
+MCvif <- linReg(data = attitude,
+                dep = 'rating',
+                covs = c('complaints', 'privileges'),
+                blocks = list(
+                  list('complaints', 'privileges')),
+                r = FALSE,
+                r2 = FALSE,
+                collin=TRUE)
+MCvif
+```
+
+`Tolerance` values should be greater than .25 and definitely **NOT** less than .10
+`VIF` values should be less than 4 and definitely **NOT** greater than 10
+
+#### **Determinant Template**
+
+```{r eval = FALSE, echo=TRUE}
+det(cor(dat))
+```
+
+```{r echo=TRUE}
+det(cor(attitude[1:3]))
+```
+
+#### **Transforming Data**
+
+- Square root transformation---Moderate Positive Skew
+```{r eval=FALSE, echo=TRUE}
+dat$V1T <- sqrt(dat$V1)
+```
+
+- Reflected square root transformation---Moderate Negative Skew 
+```{r eval=FALSE,echo=TRUE}
+dat$V1T <- sqrt(max(dat$V1) + 1 - dat$V1)
+```
+
+- Log transformation---Substantial Positive Skew
+```{r eval=FALSE, echo=TRUE}
+dat$V1T <- log10(dat$V1)
+```
+
+- Reflected log transformation---Substantial Negative Skew 
+```{r eval=FALSE,echo=TRUE}
+dat$V1T <- log10(max(dat$V1) + 1 - dat$V1)
+```
+
+- Inverse transformation---Severe Positive Skew
+```{r eval=FALSE, echo=TRUE}
+dat$V1T <- 1/(dat$V1)
+```
+
+- Reflected Inverse transformation---Severe Negative Skew 
+```{r eval=FALSE,echo=TRUE}
+dat$V1T <- 1/(max(dat$V1) + 1 - dat$V1)
+```
