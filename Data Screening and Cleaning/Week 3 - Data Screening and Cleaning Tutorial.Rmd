@@ -479,7 +479,7 @@ Two statistical assessments can be used to asses multivariate outliers
 
 ```{r eval=FALSE,echo=TRUE}
 # Generate Mahalanobis Distance Values
-data$mahal <- outlier(data)
+data$mahal <- scale(outlier(data))
 
 # Compare Standardized Mahalanobis Distance Values to 3.29
 data[abs(scale(data$mahal)) > 3.29] 
@@ -488,7 +488,7 @@ data[abs(scale(data$mahal)) > 3.29]
 model_cook <- lm(dat$DV ~ dat$Predictor1 + dat$Predictor2 + ...
                  + dat$PredictorK)
 
-data$cook <- cooks.distance(model_cook)
+data$cook <- scale(cooks.distance(model_cook))
 
 # Compare Standardized Cooks Distance Values to 3.29
 data[abs(scale(data$cook)) > 3.29] 
@@ -497,17 +497,16 @@ data[abs(scale(data$cook)) > 3.29]
 
 ```{r echo=TRUE}
 # Generate Mahalanobis Distance Values
-attitude$mahal <- outlier(attitude[1:3])
-
-# Compare Standardized Mahalanobis Distance Values to 3.29
-attitude[abs(scale(attitude$mahal)) > 3.29]
+attitude$mahalZ <- scale(outlier(attitude[1:3]))
 
 # Generate Cook's Distance Values
 CDlm <- lm(rating~complaints+privileges, data = attitude)
-attitude$cook <- cooks.distance(CDlm)
+attitude$cookZ <- scale(cooks.distance(CDlm))
 
+# Compare Standardized Mahalanobis Distance Values to 3.29
+no_mv_outliers <- attitude[!abs(attitude$mahalZ) > 3.29,]
 # Compare Standardized Cooks Distance Values to 3.29
-attitude[abs(scale(attitude$cook)) > 3.29] 
+no_mv_outliers <- attitude[!abs(attitude$cookZ) > 3.29,] 
 ```
 
 #### **Step 6: Assess Multicollinearity and Singularity**
