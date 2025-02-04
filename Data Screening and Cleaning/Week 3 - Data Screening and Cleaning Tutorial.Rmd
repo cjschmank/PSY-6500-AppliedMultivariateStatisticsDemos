@@ -482,7 +482,7 @@ Two statistical assessments can be used to asses multivariate outliers
 data$mahal <- scale(outlier(data))
 
 # Compare Standardized Mahalanobis Distance Values to 3.29
-data[abs(scale(data$mahal)) > 3.29] 
+data[abs(data$mahal) > 3.29,] 
 
 # Cook's Distance
 model_cook <- lm(dat$DV ~ dat$Predictor1 + dat$Predictor2 + ...
@@ -491,7 +491,7 @@ model_cook <- lm(dat$DV ~ dat$Predictor1 + dat$Predictor2 + ...
 data$cook <- scale(cooks.distance(model_cook))
 
 # Compare Standardized Cooks Distance Values to 3.29
-data[abs(scale(data$cook)) > 3.29] 
+data[abs(data$cook) > 3.29,] 
 
 ```
 
