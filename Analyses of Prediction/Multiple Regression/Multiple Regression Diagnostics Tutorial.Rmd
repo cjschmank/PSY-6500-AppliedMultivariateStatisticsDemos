@@ -1,0 +1,476 @@
+---
+title: 'Multiple Regression Diagnostics and Simultaneous Multiple Regression Tutorial'
+author: "Professor Christopher J. Schmank"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### **Multiple Regression Diagnostics Demonstration**
+
+#### **Applied Prompt**:
+
+A local resident recently joined their a newly developed charitable giving program and is interested in finding out more about `prosocial behavior` among group members. Without knowing much about the literature, they developed a short survey to give to a nearby school district to find out.
+
+    **Research Question**: What influences the amount of money given to a program for community outreach. 
+
+Ultimately, they must report their findings to their program coordinator and a statistician, who is also on the board.
+
+#### **Variables in Data**:
+
+`ID` --- identifying number for each observation
+
+`Belief` --- belief that charitable giving has a positive effect on a scale of 1-10
+
+`Need` --- rating of perceived amount of need required in the community on a scale of 1-10
+
+`Interest` --- rating of level of interest in the project on a scale of 1-10
+
+`Happy` --- rating of happiness felt when making donations on a scale of 1-10
+
+`Amount` --- amount given from 0 - 10 dollars
+
+#### **For all variables**: 
+
+A value of `99` implies that a response was missing for that variable and case
+
+#### **Load in Libraries**
+
+```{r echo = TRUE, warning=FALSE, message=FALSE}
+library(mice)
+library(MVN)
+library(lmtest)
+library(apaTables)
+library(psych)
+library(jmv)
+library(tidyverse)
+```
+
+
+#### **Load in Data**
+
+```{r echo=TRUE}
+#Load in the data frame into an object `dat`
+
+dat <- read.csv("RegDiagnostics2.csv")
+
+#View(dat)
+
+```
+
+
+#### **Change Missing Data Labels**
+
+```{r echo=TRUE}
+#Remove all `99` values from data frame and replace with `NA`s
+# MAKE SURE YOU DO NOT HAVE AN ID SET TO 99 OR IT WILL REMOVE THIS CASE NUMBER!!
+
+dat[dat=="99"] <- NA
+
+```
+
+
+### Exploratory Data Analysis
+
+#### **Descriptive Statistics**
+```{r echo=TRUE}
+# Descriptive statistics  (Default: No Removal of Missing Data)
+describe(dat)
+
+# Descriptive statistics  (Removal of Missing Data)
+describe(dat, 
+         na.rm=FALSE)
+
+```
+
+#### **Generate Univariate and Bivariate Visualizations**
+
+```{r warning = FALSE, message=FALSE, echo=TRUE}
+# Univariate Histograms of Continuous Variables
+
+ggplot(data = dat,
+       mapping = aes(x = Amount)) +
+  geom_histogram(bins = 10, color = "goldenrod3") +
+  labs(y = "Count", x = "Amount")
+
+ggplot(data = dat,
+       mapping = aes(x = Need)) +
+  geom_histogram(bins = 10, color = "goldenrod3") +
+  labs(y = "Count", x = "Need")
+
+ggplot(data = dat,
+       mapping = aes(x = Interest)) +
+  geom_histogram(bins = 10, color = "goldenrod3") +
+  labs(y = "Count", x = "Interest")
+
+ggplot(data = dat,
+       mapping = aes(x = Happy)) +
+  geom_histogram(bins = 10, color = "goldenrod3") +
+  labs(y = "Count", x = "Happy")
+
+ggplot(data = dat,
+       mapping = aes(x = Belief)) +
+  geom_histogram(bins = 10, color = "goldenrod3") +
+  labs(y = "Count", x = "Belief")
+
+```
+```{r warning = FALSE, message=FALSE, echo=TRUE}
+# Univariate Boxplots of Continuous Variables
+
+ggplot(data = dat,
+       mapping = aes(y = Amount)) +
+  geom_boxplot() +
+    labs(y = "Amount")
+
+ggplot(data = dat,
+       mapping = aes(y = Need)) +
+  geom_boxplot() +
+    labs(y = "Need")
+
+ggplot(data = dat,
+       mapping = aes(y = Interest)) +
+  geom_boxplot() +
+    labs(y = "Interest")
+
+ggplot(data = dat,
+       mapping = aes(y = Happy)) +
+  geom_boxplot() +
+    labs(y = "Happy")
+
+ggplot(data = dat,
+       mapping = aes(y = Belief)) +
+  geom_boxplot() +
+    labs(y = "Belief")
+
+```
+```{r warning=FALSE,message=FALSE,echo=TRUE}
+# Bivariate Scatterplots of Amount with Predictors
+ggplot(data = dat,
+       mapping = aes(y = Amount, x = Need)) +
+  geom_smooth(method = "lm", formula = y~x, se=FALSE) +
+  geom_point() +
+  labs(y = "Amount", x = "Need")
+
+ggplot(data = dat,
+       mapping = aes(y = Amount, x = Interest)) +
+  geom_smooth(method = "lm", formula = y~x, se=FALSE) +
+  geom_point() +
+  labs(y = "Amount", x = "Interest")
+
+ggplot(data = dat,
+       mapping = aes(y = Amount, x = Belief)) +
+  geom_smooth(method = "lm", formula = y~x, se=FALSE) +
+  geom_point() +
+  labs(y = "Amount", x = "Belief")
+
+ggplot(data = dat,
+       mapping = aes(y = Amount, x = Happy)) +
+  geom_smooth(method = "lm", formula = y~x, se=FALSE) +
+  geom_point() +
+  labs(y = "Amount", x = "Happy")
+
+```
+
+#### **Generate Correlations Among Variables**
+```{r echo=TRUE, warning=FALSE, message=FALSE}
+# `psych` Correlation analyses (Listwise Deletion)
+cor_listwise <- corr.test(dat[2:6], use="complete")
+print(cor_listwise, short=FALSE)
+
+# `jmv` Correlation analyses with Plots
+corrMatrix(dat[2:6],
+           ci = TRUE,
+           plots = TRUE,
+           plotDens = TRUE,
+           plotStats = TRUE)
+```
+
+#### **Assess Missing Data/Pattern**
+```{r echo=TRUE, warning=FALSE, message=FALSE}
+
+# Calculate Amount of Missing Data
+sum(is.na(dat[2:6]))/prod(dim(dat[2:6]))
+
+# Assess Pattern of Missing Data
+md.pattern(dat[2:6])
+
+# Due to small amount of missing data we will use listwise deletion and proceed
+```
+
+
+#### **List-wise deletion of missing data**
+```{r echo=TRUE, warning=FALSE, message=FALSE}
+# Listwise deletion results in 7 cases removed from data
+# Will create new data object to compare analyses later
+dat_no_NA <- na.omit(dat)
+
+```
+
+
+#### **Assessment of Univariate Outliers**
+```{r echo=TRUE, warning=FALSE,message=FALSE}
+#Identify outliers
+dat_no_NA[abs(scale(dat_no_NA$Belief)) > 3.29, ]
+dat_no_NA[abs(scale(dat_no_NA$Need)) > 3.29, ]
+dat_no_NA[abs(scale(dat_no_NA$Interest)) > 3.29, ]
+dat_no_NA[abs(scale(dat_no_NA$Happy)) > 3.29, ]
+dat_no_NA[abs(scale(dat_no_NA$Amount)) > 3.29, ]
+
+#Belief has 2 univariate outliers (IDs 100 and 105)
+#Need has 0
+#Interest has 0
+#Happy has 1 univariate outlier  (ID 100)
+#Amount has 2 univariate outliers  (IDs 100 and 105)
+
+```
+
+#### **Remove Univariate Outliers**
+```{r}
+# Step needs to be conducted sequentially as shown below (can be expanded with larger datasets)
+dat.no.uni1 <- dat_no_NA[!abs(scale(dat_no_NA$Belief)) > 3.29, ]
+dat.no.uni2 <- dat.no.uni1[!abs(scale(dat.no.uni1$Need)) > 3.29, ]
+dat.no.uni3 <- dat.no.uni2[!abs(scale(dat.no.uni2$Interest)) > 3.29, ]
+dat.no.uni4 <- dat.no.uni3[!abs(scale(dat.no.uni3$Happy)) > 3.29, ]
+dat_no_NA_UNI <- dat.no.uni4[!abs(scale(dat.no.uni4$Amount)) > 3.29, ]
+
+```
+
+
+#### **Reassess Univariate Normality After Univariate Outlier Removal**
+```{r}
+describe(dat_no_NA_UNI[2:6])
+```
+
+
+#### **Multivariate Outliers - Mahalanobis and Cook's Distances**
+```{r}
+# Mahalanobis Distance
+dat_no_NA_UNI$mahal <- outlier(dat_no_NA_UNI[2:6])
+
+dat_no_NA_UNI[abs(scale(dat_no_NA_UNI$mahal)) > 3.29, ]
+
+## 2 Multivariate Outliers Identified (IDs 103 and 104)
+
+#Cook's Distance
+lm<-lm(Amount~Belief + Need + Interest + Happy, data = dat_no_NA_UNI)
+
+#Generate Cook's Distance
+dat_no_NA_UNI$cooks <- cooks.distance(lm)
+
+dat_no_NA_UNI[abs(scale(dat_no_NA_UNI$cooks)) > 3.29, ]
+
+## 1 Multivariate Outlier Identified (ID 103)
+
+#Remove multivariate outliers
+dat_no_NA_UMO <- dat_no_NA_UNI[!abs(scale(dat_no_NA_UNI$mahal)) > 3.29,]
+
+
+```
+#### **Multivariate Outlier Iteration Checking Code**
+```{r}
+# Mahalanobis Distance
+dat_no_NA_UMO$mahal <- outlier(dat_no_NA_UMO[2:6])
+
+dat_no_NA_UMO[abs(scale(dat_no_NA_UMO$mahal)) > 3.29, ]
+
+# 0 Multivariate Outliers Identified
+
+#Cook's Distance
+lm<-lm(Amount~Belief + Need + Interest + Happy, data = dat_no_NA_UMO)
+
+#Generate Cook's Distance
+dat_no_NA_UMO$cooks <- cooks.distance(lm)
+
+dat_no_NA_UMO[abs(scale(dat_no_NA_UMO$cooks)) > 3.29, ]
+
+## Multivariate Outliers Identified IDs #1[142], #2[140,150], #3[111,136], #4[107,138], 
+## #5[101,173], #6[113,131,162], #7[102,205], #8[197], #9[187], #10[166]
+
+#Remove multivariate outliers
+dat_no_NA_UMO <- dat_no_NA_UMO[!abs(scale(dat_no_NA_UMO$cooks)) > 3.29,]
+```
+
+#### **Rename Data Object for Additional Assumption Checks**
+```{r}
+dat_final <- dat_no_NA_UMO
+
+# Remove extra datasets
+rm(dat.no.uni1,
+   dat.no.uni2,
+   dat.no.uni3,
+   dat.no.uni4,
+   dat_no_NA,
+   dat_no_NA_UMO,
+   dat_no_NA_UNI)
+```
+
+
+#### **Multivariate Normality**
+```{r}
+# Mardia's Test of Multivariate Normality
+mardia <- mvn(dat_final[2:6],
+              mvnTest = "mardia",
+              desc = FALSE)
+
+# Henze-Zirkler's Test of Multivariate Normality
+hz <- mvn(dat_final[2:6],
+          mvnTest = "hz",
+          desc = FALSE)
+
+# Energy Test of Multivariate Normality
+energy <- mvn(dat_final[2:6],
+              mvnTest = "energy",
+              desc = FALSE)
+
+# Doornik-Hansen's Test of Multivariate Normality
+dh <- mvn(dat_final[2:6],
+          mvnTest = "dh",
+          desc = FALSE)
+
+mardia$multivariateNormality
+hz$multivariateNormality
+energy$multivariateNormality
+dh$multivariateNormality
+
+```
+
+#### **Homoscedasticity**
+```{r}
+
+bplm<-lm(Amount~Belief+Need+Interest+Happy, data = dat_final[2:6])
+
+#Breusch-Pagan test 
+bptest(bplm, studentize=FALSE)
+bptest(bplm, studentize=TRUE)
+
+```
+
+
+#### **Multicollinearity**
+```{r}
+
+#VIF and Tolerance
+collin <- linReg(data = dat_final, 
+                 dep = Amount, 
+                 cov = c(Belief, Need, Interest, Happy),
+                 blocks = list(list('Belief','Need','Interest','Happy')), 
+                 r=FALSE,
+                 r2=FALSE,
+                 collin = TRUE)
+collin
+
+```
+
+
+#### **Multiple Regression Cleaned vs. Uncleaned Data**
+```{r}
+corrMatrix(dat_final[2:6],
+           ci = TRUE,
+           plots = TRUE,
+           plotDens = TRUE,
+           plotStats = TRUE)
+
+# Multiple regression not clean
+linReg(data = dat,
+       dep = 'Amount',
+       covs = c('Belief', 'Need', 'Interest', 'Happy'),
+       blocks = list(list('Belief', 'Need', 'Interest', 'Happy')),
+       r2Adj = TRUE,
+       modelTest=TRUE,
+       ci = TRUE,
+       stdEst = TRUE,
+       ciStdEst = TRUE)
+
+#Multiple regression clean
+linReg(data = dat_final, 
+       dep = 'Amount', 
+       covs = c('Belief', 'Need', 'Interest', 'Happy'),
+       blocks = list(list('Belief', 'Need', 'Interest', 'Happy')), 
+       r2Adj = TRUE,
+       modelTest=TRUE,
+       ci = TRUE,
+       stdEst = TRUE,
+       ciStdEst = TRUE)
+
+
+```
+
+#### Model Pruning and Model Comparisons/Parsimonious Models
+```{r}
+#Simple Bivariate Regression (Amount ~ Belief)
+lm1 <- lm(Amount~Belief, data = dat_final)
+
+#Simple Standardized Bivariate Regression (Amount ~ Belief)
+zlm1 <- lm(scale(Amount) ~ scale(Belief), data = dat_final)
+
+#Call for standardized regression coefficients/summary
+summary(zlm1)
+
+#Call for standardized regression confidence intervals
+confint(zlm1)
+```
+```{r}
+#Multiple Linear Regression 
+lm2 <- lm(Amount~Belief+Need, data = dat_final)
+
+#Standardized Multiple Regression
+zlm2 <- lm(scale(Amount) ~ scale(Belief) + scale(Need), data = dat_final)
+
+#Call for standardized MR coefficients/summary
+summary(zlm2)
+
+#Call for standardized MR confidence intervals
+confint(zlm2)
+```
+**Direct Model Comparison**
+```{r}
+#Model Comparison
+anova(lm1, lm2)
+```
+
+#### **Run and Visualize Final Model**
+```{r}
+linReg(data = dat_final, 
+       dep = 'Amount', 
+       covs = c('Belief', 'Need'),
+       blocks = list(list('Belief', 'Need')), 
+       r2Adj = TRUE,
+       modelTest=TRUE,
+       ci = TRUE,
+       stdEst = TRUE,
+       ciStdEst = TRUE)
+```
+```{r}
+# create predicted values from three predictors and save in object
+dat_final$predictedF <- fitted(lm2)
+dat_final$residuals <- resid(lm2)
+
+# plot predicted line
+ggplot(data = dat_final,
+       mapping = aes(x = Amount, y = predictedF)) +
+  geom_smooth(method = "lm", formula = y ~ x) +
+  geom_point() +
+  labs(x = "Amount Given", y = "Predicted Amount Given")
+
+```
+
+**Checking residual plots**
+```{r}
+modelF <- linReg(data = dat_final, 
+                 dep = Amount, 
+                 covs = vars(Belief,Need),
+                 blocks = list(list('Belief','Need')), 
+                 modelTest = FALSE,
+                 r=FALSE,
+                 r2=FALSE,
+                 resPlots=TRUE)
+modelF
+
+ggplot(data = dat_final,
+       mapping = aes(x = residuals)) +
+  geom_histogram()
+```
+
