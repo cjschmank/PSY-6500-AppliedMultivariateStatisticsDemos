@@ -1,7 +1,16 @@
 Tutorials for Correlation, Linear Regression, Regression Diagnostics, and Multiple Regression in R
 
-Covariance, Correlation, and Regression Tutorial.Rmd --- provides basic RMarkdown script for conducting assessments of data covariance and correlation as well as simple linear regression. Additionally, provides example write-up content and APA style tables for publications using these techniques. 
+Covariance, Correlation, and Regression Tutorial.Rmd --- provides basic RMarkdown script for conducting assessments 
+of data covariance and correlation as well as simple linear regression. Additionally, provides example write-up 
+content and APA style tables for publications using these techniques. 
 
-Multiple Regression Diagnostics Tutorial.Rmd --- provides various regression related assumption diagnostics required to ensure data is appropriate for assessment of Multiple Regression. You will need to download the RegDiagnostics2.csv file and have it in your current working directory for the RMarkdown file to function properly. Regression diagnostics can be knit as is BUT assessment of multivariate outliers required 10 iterations for removal of all outliers present based on Mahalanobis and Cook's Distance values and code does not reflect this unless conducted iteratively. ID numbers of which cases should be removed based on triangulating these values are commented out within RMarkdown file.
+Multiple Regression Diagnostics Tutorial.Rmd --- provides various regression related assumption diagnostics required 
+to ensure data is appropriate for assessment of Multiple Regression. You will need to download the RegDiagnostics2.csv 
+file and have it in your current working directory for the RMarkdown file to function properly. Regression diagnostics 
+can be knit as is BUT assessment of multivariate outliers required 10 iterations for removal of all outliers present 
+based on Mahalanobis and Cook's Distance values and code does not reflect this unless conducted iteratively. ID numbers 
+of which cases should be removed based on triangulating these values are commented out within RMarkdown file.
 
-Moderation and Mediation Tutorial.Rmd --- provides various ways to assess moderation and mediation using RMarkdown and associated visualizations that can be used. You will need to download the DemoMod.csv and DemoMed.csv files and have them in your current working directory for the RMarkdown file to function properly.
+Moderation and Mediation Tutorial.Rmd --- provides various ways to assess moderation and mediation using RMarkdown 
+and associated visualizations that can be used. You will need to download the DemoMod.csv and DemoMed.csv files and 
+have them in your current working directory for the RMarkdown file to function properly.
