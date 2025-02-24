@@ -1,0 +1,285 @@
+---
+title: 'Multiple Regression: Moderation and Mediation Tutorial'
+author: "Professor Christopher J. Schmank"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Load in required libraries
+
+```{r message=FALSE,warning=FALSE}
+library(jmv)
+library(rockchalk)
+library(psych)
+library(multilevel)
+library(tidyverse)
+```
+
+
+#### **Load data set into R-Environment**
+```{r}
+
+dat<-read.csv("DemoMod.csv")
+dat2<-read.csv("DemoMed.csv")
+
+```
+
+
+### Moderation Tutorial Markdown
+
+We are going to use `dat` for a tutorial of moderation analyses. This data set consists of performance evaluation review data (`perf_eval`) for employees of a Marketing Firm. Additionally, we have data for the employee's original interview rating (`interview`), their age at hire (`age`), dichotomous coded sex (`gender`: 0 = Males; 1 = Females), and polytomous race (`race`: 1 = Caucasian, 2 = African-American, 3 = Asian).
+
+**Applied prompt**: Our boss wants to know if the association between performance evaluation and interview ratings is moderated by the demographic variables of age and gender. We will treat performance evaluation as the criterion variable for this  tutorial.
+
+#### **Recode Predictors and Moderators (Centering and Dummy Coding)**
+
+```{r}
+# Center all predictors/moderators that are continuous
+dat$interviewC <- dat$interview - mean(dat$interview) 
+dat$ageC <- dat$age - mean(dat$age) 
+
+# Dummy code all categorical variables NOT already coded 0 and 1 
+AA_dc <- dummy.code(dat$race, group = 2)
+As_dc <- dummy.code(dat$race, group = 3)
+dat <- data.frame(dat, AA_dc, As_dc)
+```
+
+#### **Calculate Descriptive Statistics and Correlation Matrix**
+
+```{r}
+dat$genderF <- factor(dat$gender,
+                     levels = c(0,1), 
+                     labels = c("Women","Men"))
+
+describe(dat[2:4])
+
+describeBy(dat[2:4],
+           group = dat$genderF,
+           mat=TRUE)
+
+corrMatrix(dat[,c(2:5,9:10)],
+           plots = TRUE,
+           plotDens = TRUE,
+           plotStats = TRUE)$plot
+
+```
+
+#### **Moderation | `linReg()` Technique**
+
+```{r}
+
+linReg(data = dat,                       
+       dep = 'perf_eval',                
+       covs = c('interviewC', 'gender'), 
+       blocks = list(                    
+         list('interviewC', 'gender')),  
+       ci = TRUE,
+       r2Adj = TRUE,
+       modelTest = TRUE,                 
+       stdEst = TRUE,                    
+       ciStdEst = TRUE)   
+
+linReg(data = dat,                       
+       dep = 'perf_eval',                
+       covs = c('interviewC', 'ageC'), 
+       blocks = list(                    
+         list('interviewC', 'ageC')),  
+       ci = TRUE,
+       r2Adj = TRUE,
+       modelTest = TRUE,                 
+       stdEst = TRUE,                    
+       ciStdEst = TRUE)  
+
+```
+
+```{r}
+
+# Create our interaction term(s)
+
+dat$int_gender <- dat$interviewC*dat$gender
+dat$int_age <- dat$interviewC*dat$ageC
+
+
+linReg(data = dat, 
+       dep = 'perf_eval', 
+       covs = c('interviewC', 'gender','int_gender'),
+       blocks = list(                                  
+         list('interviewC', 'gender'),                 
+         list('int_gender')),                         
+       ci = TRUE,
+       modelTest = TRUE,
+       r2Adj = TRUE,
+       stdEst = TRUE,
+       ciStdEst = TRUE)
+
+linReg(data = dat, 
+       dep = 'perf_eval', 
+       covs = c('interviewC', 'ageC','int_age'),
+       blocks = list(                                  
+         list('interviewC', 'ageC'),                 
+         list('int_age')),                         
+       ci = TRUE,
+       modelTest = TRUE,
+       r2Adj = TRUE,
+       stdEst = TRUE,
+       ciStdEst = TRUE)
+```
+
+
+#### **Moderation | `lm()` Technique**
+
+```{r}
+#Interview x Gender Moderation Models
+no_mod1 <- lm(perf_eval ~ interviewC + gender, data = dat)
+no_mod1Z <- lm(scale(perf_eval) ~ scale(interviewC) + scale(gender), data = dat)
+
+mod1 <- lm(perf_eval ~ interviewC*gender, data = dat)
+mod1Z <- lm(scale(perf_eval) ~ scale(interviewC*gender), data = dat)
+
+#Interview x Age Moderation Models
+no_mod2 <- lm(perf_eval ~ interviewC + ageC, data = dat)
+no_mod2Z <- lm(scale(perf_eval) ~ scale(interviewC) + scale(ageC), data = dat)
+
+mod2 <- lm(perf_eval ~ interviewC*ageC, data = dat)
+mod2Z <- lm(scale(perf_eval) ~ scale(interviewC*ageC), data = dat)
+
+```
+
+```{r}
+# Direct model comparisons
+anova(no_mod1, mod1)
+anova(no_mod2, mod2)
+```
+
+```{r}
+# Model Statistic Summaries for unstandardized regression coefficients
+# Uncomment additional summary calls for standardized regression coefficients
+
+summary(no_mod1)
+summary(mod1)
+#summary(no_mod1Z)
+#summary(mod1Z)
+
+summary(no_mod2)
+summary(mod2)
+#summary(no_mod2Z)
+#summary(mod2Z)
+```
+
+```{r}
+# Visualization of Moderation Plots
+plotSlopes(mod1,                            
+           plotx = "interviewC",                
+           modx = "gender",                     
+           main = "Gender Moderates Interview Rating Impact on Performance Eval",
+           xlab = "Interview Score (Centered)", 
+           ylab = "Performance Evaluation",
+           modxVals = "std.dev.",
+           legendArgs = list(title = "Mod: Gender"))     
+
+plotSlopes(mod2,                            
+           plotx = "interviewC",                
+           modx = "ageC",                     
+           main = "Age Moderates Interview Rating Impact on Performance Eval",
+           xlab = "Interview Score (Centered)", 
+           ylab = "Performance Evaluation",
+           modxVals = "std.dev.",
+           n = 5,
+           legendArgs = list(title = "Mod: Age (Centered)")) 
+```
+
+
+---
+
+### Mediation Tutorial Markdown
+
+We are going to use `dat2` for a tutorial on mediation analyses. This data set consists of customer product review data. A product was reviewed by customers based on how much they enjoy the product (`Enjoy`), the quality of the product (`Qual`), how excited the customer was to purchase the item (`Excite`), how happy the purchase made the customer (`Happy`), and how much intent went into the purchase (`Intent`).
+
+**Applied prompt**: The product manager wants to know how enjoyment of the product impacts quality ratings and whether the association between these variables can be accounted for by the intent of purchasing the product. We will treat quality as the criterion variable for this tutorial, with enjoyment and intent as predictor and mediator, respectively.
+
+#### **Calculate Descriptive Statistics and Correlation Matrix**
+
+```{r}
+
+describe(dat2[2:6])
+
+corrMatrix(dat2[2:6],
+           plots = TRUE,
+           plotDens = TRUE,
+           plotStats = TRUE)$plot
+
+```
+
+#### **Mediation | `linReg()` Technique**
+
+```{r}
+#Indirect Path (a): M ~ X 
+
+linReg(data=dat2,
+       dep=Intent,
+       covs=c(Enjoy),
+       blocks=list(
+         list('Enjoy')),
+       ci = TRUE,
+       modelTest = TRUE,
+       r2Adj = TRUE,
+       stdEst = TRUE,
+       ciStdEst = TRUE)
+```
+
+```{r eval=FALSE,echo=TRUE}
+# Step 1: Y ~ X (Path c) <br>
+# Step 2: Y ~ X + Med (Paths b and c')
+linReg(data=dat2,
+       dep=Qual,
+       covs=c(Enjoy,Intent),
+       blocks=list(
+         list('Enjoy'),
+         list('Intent')),
+       ci = TRUE,
+       modelTest = TRUE,
+       r2Adj = TRUE,
+       stdEst = TRUE,
+       ciStdEst = TRUE)
+```
+
+#### **Mediation | `lm()` Technique**
+
+```{r}
+# Standardized Direct Path (c)
+lm1Z <- lm(scale(Qual)~scale(Enjoy), dat2)
+lm1 <- lm(Qual ~ Enjoy, dat2)
+
+# Standardized Indirect Path (a)
+lm2Z <- lm(scale(Intent) ~ scale(Enjoy), dat2)
+lm2 <- lm(Intent ~ Enjoy, dat2)
+
+# Standardized Direct Path (c') and Indirect Path (b)
+lm3Z <- lm(scale(Qual) ~ scale(Enjoy) + scale(Intent), dat2)
+lm3 <- lm(Qual ~ Enjoy + Intent, dat2)
+
+# Model Comparison for Mediation Effect
+anova(lm1Z, lm3Z)
+
+# Model Statistic Summaries
+summary(lm1Z)
+summary(lm2Z)
+summary(lm3Z)
+
+# Conducting Sobel's Indirect Effect Test
+sobel(pred=dat2$Enjoy, med=dat2$Intent,out=dat2$Qual)
+```
+
+#### **Visualization of Mediation Model**
+```{r}
+mediate(Qual ~ Enjoy + (Intent), 
+        data = dat2,
+        std = TRUE,
+        main = "Predicting Quality from Enjoyment Mediated by Intention"
+        )$plot
+```
+
