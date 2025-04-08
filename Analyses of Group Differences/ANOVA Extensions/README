@@ -1,0 +1,34 @@
+Tutorials for One-way (Between-Subject and Within-Subjects), Factorial (Fully-Between Subjects), Mixed (Between and Within), 
+and Three-way Factorial ANOVAs, and ANCOVA in R
+
+One-Way_ANOVA_Demo_Between-Subjects.Rmd --- provides basic RMarkdown script for conducting assessments 
+of one-way, between-subject ANOVA. Additionally, provides example APA style tables for publications/manuscripts 
+using these techniques. 
+
+One-Way_ANOVA_Demo_Within-Subjects.Rmd --- provides basic RMarkdown script for conducting assessments 
+of one-way, within-subjects ANOVA. Additionally, provides example APA style tables for publications/manuscripts 
+using these techniques.
+
+Factorial_ANOVA_Demo.Rmd --- provides RMarkdown script for conducting factorial ANOVA assessments 
+with two between-subject variables. Additionally, provides example APA style tables for publications/manuscripts 
+using these techniques.
+
+Mixed_Factorial_ANOVA_Demo.Rmd --- provides RMarkdown script for conducting factorial ANOVA assessments 
+with single between-subject and within-subjects variables. Additionally, provides example APA style tables for 
+publications/manuscripts using these techniques.
+
+Three-way Factorial ANOVA.Rmd --- provides RMarkdown script for conducting factorial ANOVA assessment 
+with three between-subject variables.
+
+One-way and Factorial ANCOVA Demo.Rmd --- provides RMarkdown script for conducting one-way and factorial ANCOVA 
+assessments. Additionally, provides example APA style tables for publications/manuscripts using these techniques.
+
+You will need to download the following csv files and have them in your current working directory for the RMarkdown 
+files to function properly: 
+
+One-way Between-Subject --- One-way ANOVA.A.csv
+One-way Within-Subjects --- RM.ANOVA.Demo.csv
+Factorial ANOVA --- FACTORIAL_DEMO.csv
+Mixed-Factorial ANOVA --- Mixed_Factorial.csv
+Three-way Factorial ANOVA --- anova3.csv
+ANCOVA Demo --- ancova1.csv, ancova2.csv
