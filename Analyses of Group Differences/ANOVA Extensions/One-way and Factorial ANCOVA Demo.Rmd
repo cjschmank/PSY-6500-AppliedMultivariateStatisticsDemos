@@ -1,0 +1,435 @@
+---
+title: "Analysis of Covariance Tutorials: One-way and Factorial Analyses"
+author: "Professor Christopher J. Schmank"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r warning=FALSE,message=FALSE}
+# Load in Required Libraries
+library(psych)
+library(tidyverse)
+library(jmv)
+library(ggpubr)
+library(apaTables)
+library(ez)
+library(rstatix)
+```
+
+## ANCOVA | One-Way Research Context Prompt
+
+**Research Context**:
+
+ Researchers investigated the effect of exercises in reducing anxiety levels. Anxiety scores were measured from three groups of individuals practicing physical exercises at different levels (`low`, `moderate`, and `high`).
+
+The anxiety score was measured `pre-` and 6-months `post-exercise` training programs. It is expected that any reduction in the anxiety by the exercises programs would also depend on the participant’s baseline level of anxiety.
+
+In this analysis we use the `pre-test anxiety score` as the covariate and are interested in possible differences between `group` with respect to the `post-test anxiety score`.
+
+## One-way ANCOVA | Data
+```{r}
+dat_anx <- read.csv("ancova1.csv")
+```
+
+## ANCOVA | Descriptive Stats (Baseline-test)
+
+```{r}
+dat_anx$groupF <- factor(dat_anx$group, 
+                         levels = c("Low", "Moderate", "High"), 
+                         labels = c("Low", "Moderate", "High"))
+
+# Descriptive Stats
+describeBy(dat_anx$pretest,   
+           dat_anx$groupF,
+           mat=TRUE)     
+
+describeBy(dat_anx$posttest,  
+           dat_anx$groupF, 
+           mat=TRUE)      
+```
+
+## ANCOVA | EDA Visualiations
+
+```{r}
+# Histograms
+ggplot(data = dat_anx,
+       mapping = aes(x = pretest)) +
+  geom_histogram(bins = 8, color = "coral") +
+  labs(y = "Count", x = "Baseline Anxiety")+
+  facet_wrap(dat_anx$groupF,ncol=1)
+
+ggplot(data = dat_anx,
+       mapping = aes(x = posttest)) +
+  geom_histogram(bins = 8, color = "coral") +
+  labs(y = "Count", x = "Post-Treatment Anxiety")+
+  facet_wrap(dat_anx$groupF,ncol=1)
+
+```
+
+```{r}
+# Boxplots
+ggplot(data = dat_anx,
+       mapping = aes(y = pretest, x = groupF)) +
+  geom_boxplot() +
+    labs(y = "Baseline Anxiety",
+         x = "Exercise Group")
+
+ggplot(data = dat_anx,
+       mapping = aes(y = posttest, x = groupF)) +
+  geom_boxplot() +
+    labs(y = "Post-Treatment Anxiety",
+         x = "Exercise Group")
+```
+
+```{r}
+# Violin Plots
+
+ggplot(data = dat_anx,
+       aes(x = groupF, y = pretest, 
+           fill = groupF))+
+  geom_violin(show.legend=FALSE)+
+  ylab("Baseline Anxiety")+
+  xlab("Exercise Group")+
+  scale_fill_manual(values=c("#D55e00","#56B4E9","#009E73"))
+
+ggplot(data = dat_anx,
+       aes(x = groupF, y = posttest, 
+           fill = groupF))+
+  geom_violin(show.legend=FALSE)+
+  ylab("Post-treatment Anxiety")+
+  xlab("Exercise Group")+
+  scale_fill_manual(values=c("#D55e00","#56B4E9","#009E73"))
+```
+
+## ANCOVA | Omnibus Assumption Check 
+
+```{r}
+ancova(data = dat_anx,       
+       dep = posttest,       
+       factors = groupF,      
+       covs = pretest,       
+       effectSize = "eta",   
+       homo = TRUE,          
+       qq = TRUE,            
+       norm = TRUE)          
+```
+
+## ANCOVA | Linearity Assumption Check
+```{r}
+
+ggscatter(dat_anx,                          
+          x = "pretest",                    
+          y = "posttest",                   
+          color = "group",
+          add = "reg.line",
+          xlab = "Pre-test Scores",
+          ylab = "Post-test Scores")+
+  stat_regline_equation(    
+    aes(label = paste(after_stat(eq.label), 
+                      after_stat(rr.label), 
+                      sep = "~~~"),         
+        color = group))
+```
+
+## ANCOVA | Homogeneity of Regression Slopes Assumption Check
+```{r}
+dat_anx %>%
+  anova_test(posttest ~ groupF*pretest)   
+
+# Since p > .05 for the interaction we can assume homogeneity of regression slopes
+```
+
+## ANCOVA | Normality of Residuals
+
+```{r}
+lm<-lm(posttest~pretest + groupF, 
+       dat_anx)
+
+model.metrics <- augment(lm)       
+
+shapiro_test(model.metrics$.resid)  
+
+# Lack of statistical significant implies that normality of residuals has been achieved
+```
+
+## ANCOVA | Homogeneity of Variances
+```{r}
+
+model.metrics %>%                 
+  levene_test(.resid ~ groupF)     
+
+# Lack of statistical significance here implies that residual variances are homogeneous across between-subject groups
+```
+
+## ANCOVA | Conducting the ANCOVA
+
+```{r}
+options(digits = 3)
+ancova(data = dat_anx,         
+       dep = posttest,            
+       factors = groupF,     
+       covs = pretest,             
+       effectSize = "eta",     
+       postHoc = 'groupF',      
+       postHocCorr = 'bonf',
+       postHocES = 'd',     
+       postHocEsCi = TRUE,  
+       emMeans=list(
+          list('groupF')),  
+       emmTables=TRUE,        
+       emmPlots=TRUE)         
+``` 
+
+## ANCOVA | Professional ANCOVA Visualization
+
+```{r}
+
+res.aov<- dat_anx %>% 
+  anova_test(dv = posttest,
+             between= group,
+             covariate = pretest,
+             effect.size = 'ges')
+
+# Generates Marginal Means for Visualization
+pwc <- dat_anx %>% 
+  emmeans_test(posttest ~ group,
+               covariate = pretest,
+               p.adjust.method = "bonferroni") %>%
+  add_xy_position(x = "group")                                   
+
+pwc
+```
+
+## ANCOVA | Professional ANCOVA Visualization
+
+```{r}
+get_emmeans(pwc)
+ggline(get_emmeans(pwc),
+       x = "group",
+       y = "emmean") +                           
+  geom_errorbar(aes(ymin = conf.low,             
+                    ymax = conf.high),
+                width = 0.1) +                   
+  stat_pvalue_manual(pwc,                        
+                     hide.ns = TRUE,             
+                     tip.length = FALSE) +       
+  ylab("Mean Post-Test Anxiety") +               
+  xlab("Group") +                                
+  labs(caption = get_pwc_label(pwc)                 
+  )
+
+```
+
+
+## ANCOVA | Factorial Research Context Prompt
+
+Your local sports psychologist and stress research enthusiast found out you were learning various quantitative statistical methods and reached out to offer you a consulting/analytics opportunity. They gathered data from 60 participants to attempt to evaluate the effect of a new protein treatment and exercise on experienced stress levels in a group of older adults. The data set (`dat_stress`) contains five variables:
+
+- `id` --- Participant identification number  
+- `score` --- Stress score collected from each participant
+- `treatment` --- Treatment variable with two levels (`yes` --- Received protein treatment; `no` --- Received placebo treatment)
+- `exercise` --- Level of exercise employed by participants (`low`, `moderate`, `high`)
+- `age` --- Age of participant when data was collected
+
+The goal for this final research question was: Does adjusting for the age of participants impact how stress scores fluctuate across treatment and exercise variables?
+
+## Factorial ANCOVA | Data
+```{r}
+dat_stress <- read.csv("ancova2.csv")
+```
+
+## Factorial ANCOVA | Descriptive Stats (Baseline-test)
+
+```{r}
+
+# Descriptive Stats
+dat_stress$Treatment <- factor(dat_stress$treatment,
+                                levels = c("no", "yes"),
+                                labels = c("No Treatment", "Protein Treatment"))
+
+dat_stress$Exercise <- factor(dat_stress$exercise, 
+                               levels = c("low", "moderate", "high"),
+                               labels = c("Low", "Moderate", "High"))
+
+describeBy(dat_stress$score,   
+           list(dat_stress$Treatment, dat_stress$Exercise),
+           mat=TRUE) 
+
+```
+
+## Factorial ANCOVA | EDA Visualizations
+
+```{r}
+
+# Histogram
+ggplot(data = dat_stress,
+       mapping = aes(x = score)) +
+  geom_histogram(bins = 8, color = "goldenrod2") +
+  labs(y = "Count", x = "Stress Score")+
+  facet_wrap(~dat_stress$Treatment + dat_stress$Exercise)
+
+# Boxplots
+ggplot(data = dat_stress,
+       mapping = aes(y = score, x = Treatment)) +
+  geom_boxplot() +
+    labs(y = "Stress Score")
+
+ggplot(data = dat_stress,
+       mapping = aes(y = score, x = Exercise)) +
+  geom_boxplot() +
+    labs(y = "Stress Score")
+
+# Violin Plot
+ggplot(data = dat_stress,
+       aes(x = Exercise, y = score, 
+           fill = Treatment))+
+  geom_violin(show.legend=TRUE)+
+  ylab("Stress Score")+
+  xlab("Exercise Type")+
+  scale_fill_manual(values=c("#D55e00","#56B4E9","#009E73"))
+
+```
+
+
+## Factorial ANCOVA | Assumption Check: Omnibus and Grouped Level 
+
+```{r}
+
+# Check Assumptions using techniques described in class
+
+ancova(data = dat_stress,       
+       dep = score,             
+       factors = c(Treatment,Exercise),      
+       covs = age,
+       effectSize = "partEta",
+       homo = TRUE,          
+       qq = TRUE,
+       norm = TRUE)
+
+# Grouped Assumption Checks
+
+# Linear relationship based on age and IVs
+ggscatter(dat_stress,  
+          x = "age",                         
+          y = "score",                       
+          facet.by = c("Exercise","Treatment")) +
+  stat_smooth(method = "loess")
+
+# Homogeneity of Regression slopes
+
+dat_stress %>%
+  anova_test(score ~ age + Treatment + Exercise + Treatment*Exercise + age*Treatment + age*Exercise + age*Exercise*Treatment)
+
+# Normality assessments
+lm<-lm(score~age + Exercise*Treatment, dat_stress)      
+model.metrics <- augment(lm)       
+shapiro_test(model.metrics$.resid)
+
+# Homogeneity of variance assessments
+model.metrics %>%  
+  levene_test(.resid ~ Exercise*Treatment)
+```
+
+## Factorial ANCOVA | Conducting the ANCOVA
+
+```{r}
+options(digits=3)
+ancova(data = dat_stress,
+       dep = score,               
+       factors = c(Treatment,Exercise),
+       covs = age,              
+       effectSize = "partEta",
+       postHoc = ~Exercise + Treatment:Exercise,     
+       postHocCorr = 'bonf',  
+       postHocES = 'd',    
+       postHocEsCi = TRUE, 
+       emMeans= ~ Exercise + Treatment + Exercise:Treatment,
+       emmTables=TRUE,
+       emmPlots=TRUE) 
+
+# Assessment of Simple Main Effects
+dat_stress %>% 
+  group_by(Exercise) %>% 
+  anova_test(score ~ age + Treatment)
+
+dat_stress %>% 
+  group_by(Treatment) %>% 
+  anova_test(score ~ age + Exercise)
+``` 
+
+## Factorial ANCOVA | Professional ANCOVA Visualization
+
+```{r}
+# Pairwise Comparisons
+pwc <- dat_stress %>% 
+  group_by(Exercise) %>% 
+  emmeans_test(score ~ Treatment,
+               covariate = age,
+               p.adjust.method = "bonferroni")
+
+pwc %>% filter(Exercise == "High") 
+
+pwc2 <- dat_stress %>% 
+  group_by(Treatment) %>% 
+  emmeans_test(score ~ Exercise,
+               covariate = age,
+               p.adjust.method = "bonferroni")
+
+pwc2 %>% filter(Treatment == "Protein Treatment")
+
+```
+
+```{r}
+
+lp <- ggline(
+  get_emmeans(pwc),
+  x = "Exercise",
+  y = "emmean",
+  color = "Treatment",
+  palette = "grey") +
+  geom_errorbar(
+    aes(ymin = conf.low,
+        ymax = conf.high),
+    width = 0.1) 
+```
+
+```{r}
+pwc <- pwc %>% add_xy_position(x = "Exercise",
+                  fun = "mean_se",
+                  step.increase = 0.2)
+
+pwc.filtered <- pwc %>% filter(Exercise == "High")
+
+
+lp + stat_pvalue_manual(pwc,
+                     hide.ns = TRUE,
+                     tip.length = 0) +
+  labs(
+    y = "Estimated Means",
+    x = "Exercise Condition",
+    color = "Treatment",
+    caption = get_pwc_label(pwc)
+  )
+```
+
+```{r}
+pwc2 <- pwc2 %>% add_xy_position(x = "Exercise",
+                  fun = "mean_se")
+
+pwc2.filtered <- pwc2 %>% filter(Treatment == "Protein Treatment")
+
+
+lp + stat_pvalue_manual(pwc2,
+                     hide.ns = TRUE,
+                     tip.length = 0) +
+  labs(
+    y = "Estimated Means",
+    x = "Exercise Condition",
+    color = "Treatment",
+    caption = get_pwc_label(pwc)
+  )
+```

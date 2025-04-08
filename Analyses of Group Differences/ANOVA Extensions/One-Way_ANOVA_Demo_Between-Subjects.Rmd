@@ -1,0 +1,215 @@
+---
+title: "One-Way Between-Subjects ANOVA Demo"
+author: "Professor Christopher J. Schmank"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#### One-way Between-Subjects ANOVA | Research Context Prompt
+
+A developmental psychologist is looking for a Grad student who can help them with their research project looking into adolescent self-esteem and its relationship with parenting style. There were three parenting styles: (1) `authoritative` (high expectations with support), (2) `authoritarian` (high expectations with little support), and (3) `permissive` (low expectations with support).
+
+Data on 90 teenagers self-esteem levels and the parenting style they experienced (30 per style) has been collected. The research question of interest is: Does parenting style differences impact teenage self-esteem?
+
+#### One-way Between-Subjects ANOVA | Data
+
+```{r message = FALSE, warning = FALSE}
+library(psych)
+library(tidyverse)
+library(jmv)
+library(ggpubr)
+library(apaTables)
+library(rstatix)
+
+dat_A <- read.csv("One-way ANOVA.A.csv")
+dim(dat_A)
+head(dat_A)
+
+```
+
+#### One-way Between-Subjects ANOVA | Descriptive Stats
+
+```{r}
+
+# Descriptive Stats
+describe(dat_A[,2:3])
+
+```
+
+#### One-way Between-Subjects ANOVA | Grouped Descriptive Stats
+
+```{r}
+
+dat_A$Style<-factor(dat_A$Style, 
+                    labels = c("Authoritative","Authoritarian","Permissive"))
+
+# Descriptive Stats
+describeBy(dat_A$Self_esteem,
+           dat_A$Style, 
+           mat=TRUE)
+
+```
+
+### One-way Between-Subjects ANOVA | Univariate Visualizations
+
+#### One-way Between-Subjects ANOVA | Boxplot
+
+```{r}
+
+ggplot(data = dat_A,
+       mapping = aes(y = Self_esteem, x =Style)) +
+  geom_boxplot() +
+    labs(y = "Parenting Style")
+
+```
+
+#### One-way Between-Subjects ANOVA | Violin Plot
+
+```{r}
+
+ggplot(data = dat_A,
+       aes(x = Style, y = Self_esteem, 
+           fill = Style))+
+  geom_violin(show.legend=FALSE)+
+  ylab("Self-Esteem")+
+  xlab("Parenting Style")
+
+ggplot(data = dat_A,
+       aes(x = Style, y = Self_esteem, 
+           fill = Style))+
+  geom_violin(show.legend=FALSE)+
+  ylab("Self-Esteem")+
+  xlab("Parenting Style")+
+  scale_fill_manual(values=c("#D55e00","#56B4E9","#009E73"))
+
+```
+
+#### One-way Between-Subjects ANOVA | Omnibus Assumption Checks Code
+
+```{r}
+
+# Omnibus Assumption Checking
+ANOVA(data = dat_A, 
+      dep = 'Self_esteem', 
+      factors = c('Style'),
+      homo = TRUE,
+      norm = TRUE,
+      qq = TRUE)
+
+```
+
+#### One-way Between-Subjects ANOVA | Group Level Assumption Checks 
+
+```{r}
+
+dat_A %>% 
+  group_by(Style) %>% 
+  shapiro_test(Self_esteem)
+
+```
+
+#### One-way Between-Subjects ANOVA | Group Level Assumption Checks
+
+```{r}
+
+ggqqplot(dat_A,
+         'Self_esteem',
+         facet.by = "Style")
+
+```
+
+#### One-way Between-Subjects ANOVA | Rechecking Homogen. of Variance using `rstatix`
+
+```{r}
+
+dat_A %>% 
+  levene_test(Self_esteem ~ as.factor(Style), center = mean)
+
+```
+
+#### One-way Between-Subjects ANOVA | Conducting the ANOVA Code
+
+```{r}
+options(digits = 3)
+ANOVA(data = dat_A, 
+      dep = 'Self_esteem', 
+      factors = c('Style'), 
+      effectSize = 'eta', 
+      postHoc = 'Style', 
+      postHocCorr = 'bonf',
+      postHocES = 'd',
+      postHocEsCi = TRUE,
+      emMeans = list(
+       list('Style')),
+      emmPlots = TRUE,
+      emmTables = TRUE)
+
+```
+
+#### One-way Between-Subjects ANOVA | Professional ANOVA Visualization Code
+
+```{r}
+
+# Pairwise Post-Hoc Tests (Bonferroni Correction)
+pwc <- dat_A %>% 
+  pairwise_t_test(Self_esteem ~ Style, p.adjust.method = "bonferroni") %>% 
+  add_xy_position(x = "Style")
+
+```
+
+#### One-way Between-Subjects ANOVA | Professional ANOVA Visualization Code
+
+```{r}
+
+# Visualization: box plots with p-values
+ggboxplot(dat_A, 
+          x = "Style", 
+          y = "Self_esteem", 
+          notch = TRUE, 
+          outlier.shape = NA) +
+  stat_pvalue_manual(pwc, 
+                     hide.ns = TRUE, 
+                     tip.length = .01) +
+  labs(caption = get_pwc_label(pwc),
+       y = "Self Esteem")
+
+```
+
+#### One-way Between-Subjects ANOVA | Saving the ANOVA Model
+
+```{r}
+
+aovm<-ANOVA(data = dat_A, 
+            dep = 'Self_esteem', 
+            factors = c('Style'), 
+            effectSize = 'eta', 
+            postHoc = 'Style', 
+            postHocCorr = 'bonf',
+            postHocES = 'd',
+            postHocEsCi = TRUE,
+            emMeans = list(
+              list('Style')),
+            emmPlots = TRUE,
+            emmTables = TRUE)$model
+
+```
+
+#### One-way Between-Subjects ANOVA | APA Style ANOVA Tables
+
+```{r}
+
+apa.aov.table(aovm,
+              table.number=1,
+              conf.level=.95,
+              type = 3)
+
+apa.1way.table(Style,
+               Self_esteem,
+               dat_A,
+               table.number=2,
+               show.conf.interval = TRUE)
+```

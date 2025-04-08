@@ -1,0 +1,357 @@
+---
+title: "Mixed-Factorial ANOVA Demo"
+author: "Professor Christopher J. Schmank"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#### Mixed Factorial ANOVA | Research Context Prompt
+
+The same stress researcher from our previous demonstration conducted another study to determine the impact of psychosocial stress on participants processing speed ability using a mixed-factorial research design. 
+
+The researcher randomly assigned 30 participants to one of two stress conditions: (1) Low Stress and (2) High Stress. Participants were assessed at three separate times across their academic career (Sophomore, Junior, and Senior) measuring a new processing speed performance measure. The dependent measure in this task was processing speed ability measured in milliseconds (500 ms = .5 seconds).
+
+Again, this researcher believed that regulating feelings of stress would impair concurrent performance of processing speed and that these effects would materialize across time.
+
+#### Mixed Factorial ANOVA | Data
+
+```{r message = FALSE, warning = FALSE}
+
+library(psych)
+library(tidyverse)
+library(jmv)
+library(ggpubr)
+library(apaTables)
+library(ez)
+library(rstatix)
+library(reshape)
+
+dat_MF <- read.csv("Mixed_Factorial.csv")
+dat_MF$Time <- 1000 - dat_MF$Time
+
+# SUPER IMPORTANT FOR WITHIN SUBJECT DESIGNS
+# Set Subject or ID variable to a factor  
+dat_MF$Subject <- factor(dat_MF$Subject)
+
+# Set IVs to factors  
+dat_MF$Condition <- factor(dat_MF$Condition, labels = c("Low-Stress","High-Stress"))
+dat_MF$Rank <- factor(dat_MF$Rank, labels = c("Sophomore", "Junior", "Senior"))
+
+# Assess number of participants and variables in data set
+dim(dat_MF)
+head(dat_MF)
+
+# To use anovaRM() we must reshape our data set from `long` to `wide` 
+dat_MFW <- cast(dat_MF,
+                Subject + Condition ~ Rank, #Isolates each ID and Condition to form columns for Rank
+                value = "Time")             #Tells function to use Time variable to fill in Ranks
+
+dat_MFW$averageTime <- (dat_MFW$Sophomore + dat_MFW$Junior + dat_MFW$Senior) / 3 # This is used later for assumption checking
+```
+
+#### Mixed Factorial ANOVA | Descriptive Stats
+
+```{r}
+
+# Descriptive Stats
+describeBy(dat_MF$Time,
+           list(dat_MF$Condition, dat_MF$Rank),
+           mat=TRUE)
+
+```
+
+
+#### Mixed Factorial ANOVA | Histogram
+
+```{r}
+
+ggplot(data = dat_MF,
+       mapping = aes(x = Time)) +
+  geom_histogram(bins = 10, color = "steelblue") +
+  labs(y = "Count", x = "Time")+
+  facet_wrap(~dat_MF$Condition + dat_MF$Rank)
+
+```
+#### Mixed Factorial ANOVA | Boxplot
+
+```{r }
+
+ggplot(data = dat_MF,
+       mapping = aes(y = Time, x = Condition)) +
+  geom_boxplot() +
+    labs(y = "Processing Speed (Milliseconds)")
+
+```
+
+#### Mixed Factorial ANOVA | Boxplot
+
+```{r}
+
+ggplot(data = dat_MF,
+       mapping = aes(y = Time, x = Rank)) +
+  geom_boxplot() +
+    labs(y = "Processing Speed (Milliseconds)")
+
+```
+
+#### Mixed Factorial ANOVA | Violin Plot
+
+```{r}
+
+ggplot(data = dat_MF,
+       aes(x = Condition, y = Time, 
+           fill = Condition))+
+  geom_violin(show.legend=FALSE)+
+  ylab("Processing Speed (Milliseconds)")+
+  xlab("Condition")+
+  scale_fill_manual(values=c("#D55e00","#56B4E9","#009E73"))
+
+```
+
+#### Mixed Factorial ANOVA | Violin Plot
+
+```{r}
+
+ggplot(data = dat_MF,
+       aes(x = Rank, y = Time, 
+           fill = Rank))+
+  geom_violin(show.legend=FALSE)+
+  ylab("Processing Speed (Milliseconds)")+
+  xlab("Rank")+
+  scale_fill_manual(values=c("#D55e00","#56B4E9","#009E73"))
+
+```
+
+#### Mixed Factorial ANOVA | Grouped Violin Plot
+
+```{r}
+
+ggplot(data = dat_MF,
+       aes(x = Rank, y = Time, 
+           fill = Condition))+
+  geom_violin(show.legend=TRUE)+
+  ylab("Processing Speed (Milliseconds)")+
+  xlab("Rank")+
+  scale_fill_manual(values=c("#D55e00","#56B4E9","#009E73"))
+
+```
+
+#### Mixed Factorial ANOVA | anovaRM() Omnibus Assumption Checks
+
+```{r}
+
+anovaRM(data=dat_MFW,                          
+        bs = list('Condition'),             
+        bsTerms = list('Condition'),
+        rm = list(                  
+             list(label = 'Rank',    
+                  levels = list('Sophomore',    
+                                'Junior',
+                                'Senior'))),  
+        rmCells = list(
+           list(measure = 'Sophomore',
+                cell = 'Sophomore'),
+           list(measure = 'Junior',
+                cell = 'Junior'),
+           list(measure = 'Senior',
+                cell = 'Senior')),             
+        rmTerms= list('Rank'),                
+        leveneTest = TRUE,                   
+        qq = TRUE,                           
+        spherTests = TRUE)                   
+
+```
+
+#### Mixed Factorial ANOVA | Group Level Assumption Checks
+
+```{r}
+
+dat_MF %>% 
+  group_by(Condition, Rank) %>% 
+  shapiro_test(Time)
+
+```
+
+#### Mixed Factorial ANOVA | Group Level Assumption Checks
+
+```{r}
+
+ggqqplot(dat_MF,
+         'Time',
+         facet.by = c("Condition","Rank"))
+
+```
+
+#### Mixed Factorial ANOVA | Group Level Assumption Checks
+
+```{r}
+
+dat_MFW %>% 
+  levene_test(averageTime ~ Condition,   
+              center = mean)
+
+```
+
+#### Mixed Factorial ANOVA | Group Level Assumption Checks
+
+```{r}
+
+# Must be conducted ON A MATRIX!! Also, note that it is using the long version of the data!
+
+box_m(as.data.frame(dat_MF$Time),      
+      dat_MF$Condition)        
+
+```
+
+#### Mixed Factorial ANOVA | Conducting the ANOVA
+
+```{r}
+options(digits = 3)
+anovaRM(data = dat_MFW,
+        bs = list('Condition'),             
+        bsTerms = list('Condition'),
+        rm = list(                  
+             list(label = 'Rank',    
+                  levels = list('Sophomore',    
+                                'Junior',
+                                'Senior'))),  
+        rmCells = list(
+           list(measure = 'Sophomore',
+                cell = 'Sophomore'),
+           list(measure = 'Junior',
+                cell = 'Junior'),
+           list(measure = 'Senior',
+                cell = 'Senior')),             
+        rmTerms = list('Rank'),
+        postHoc = list('Rank', c('Rank','Condition')),
+        postHocCorr = 'bonf',  
+        emMeans = list('Rank','Condition', c('Rank','Condition')), 
+        emmPlots = TRUE,
+        emmTables = TRUE,
+        effectSize = 'partEta')
+```
+
+#### Mixed Factorial ANOVA | ANOVA Output: Interaction Simple Effects
+
+```{r}
+
+one.way <- dat_MF %>%                  
+  group_by(Condition) %>%              
+  anova_test(dv = Time,                
+             wid = Subject,            
+             within = Rank,            
+             effect.size = 'ges') %>%  
+  get_anova_table() %>%                
+  adjust_pvalue(method = "bonferroni") 
+
+one.way
+
+
+one.way2 <- dat_MF %>%                  
+  group_by(Rank) %>%              
+  anova_test(dv = Time,                
+             between = Condition,            
+             effect.size = 'ges') %>%  
+  get_anova_table() %>%                
+  adjust_pvalue(method = "bonferroni") 
+
+one.way2
+
+
+```
+
+Demonstrates that there are significant differences between the Ranks for participants in the Low-Stress [*F*(2, 28) = 86.50, *p* < .001] and High-Stress [*F*(1.33, 18.64) = 83.79, *p* < .001] conditions---furthermore, there is an issue of Sphericity demonstrated for the High-Stress condition (note the degrees of freedom!).
+
+
+#### Mixed Factorial ANOVA | Professional ANOVA Visualization Code
+
+```{r }
+
+# Generates Marginal Means for Visualization--the p-values here are more appropriate to interpret compared to the chunk above!
+pair <- dat_MF %>%
+  group_by(Rank) %>%
+  pairwise_t_test(Time~Condition,
+                  p.adjust.method = "bonferroni") %>%
+  add_xy_position(x = "Rank", 
+                  group = "Condition")  
+
+pair
+
+pair2 <- dat_MF %>%
+  group_by(Condition) %>%
+  pairwise_t_test(Time~Rank,
+                  p.adjust.method = "bonferroni") %>%
+  add_xy_position(x = "Condition", 
+                  group = "Rank")  
+
+pair2
+
+```
+
+Demonstrates that the difference between high- and low-stress conditions only materialized when participants were in their Sophomore (*p* = .04) and Senior (*p* = .03) years, but not when they were Juniors (*p* = .58)
+
+#### Mixed Factorial ANOVA | Professional ANOVA Visualization Code
+
+```{r}
+
+ggboxplot(dat_MF,                                  
+          x = "Rank",                              
+          y = "Time",                              
+          color = "Condition",
+          palette = "grey")+                     
+  stat_pvalue_manual(pair,                          
+                     hide.ns = FALSE,
+                     tip.length = 0)+             
+  labs(                                             
+    caption = get_pwc_label(pair)                   
+  )
+
+ggboxplot(dat_MF,                                  
+          x = "Condition",                              
+          y = "Time",                              
+          color = "Rank",
+          palette = "grey")+                     
+  stat_pvalue_manual(pair2,                          
+                     hide.ns = FALSE,
+                     tip.length = 0)+             
+  labs(                                             
+    caption = get_pwc_label(pair2)                   
+  )
+
+```
+
+#### Mixed Factorial ANOVA | APA Style ANOVA Tables
+
+```{r}
+
+res.aov <- dat_MF %>% ezANOVA(dv = .(Time), 
+                                wid = .(Subject), 
+                                between= Condition, 
+                                within = .(Rank), 
+                                detailed = TRUE)
+
+res.aov$ANOVA$ges <- res.aov$ANOVA$SSn/(res.aov$ANOVA$SSn+res.aov$ANOVA$SSd)
+
+res.aov$ANOVA<-res.aov$ANOVA[c(1:3,6:7,9)]
+
+
+apa.ezANOVA.table(res.aov,                               
+                  table.title = "Mixed Factorial ANOVA",
+                  correction="GG",
+                  filename = "This is my file.doc",
+                  table.number=7)
+
+
+
+#Generate Marginal Means Table
+apa.2way.table(Rank,                          
+               Condition,                               
+               Time,                               
+               dat_MF,                             
+               table.number=8,
+               show.conf.interval = TRUE)
+```

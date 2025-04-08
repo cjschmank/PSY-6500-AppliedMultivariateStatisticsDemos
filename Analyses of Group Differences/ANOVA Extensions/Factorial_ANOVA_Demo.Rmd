@@ -1,0 +1,327 @@
+---
+title: "Factorial ANOVA Demo"
+author: "Professor Christopher J. Schmank"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Factorial ANOVA | Research Context Prompt
+
+A local dating expert was interested in studying first-date satisfaction and whether it depended on variables like (1) date attire (i.e., Athletic Wear, Leisure Wear, or Dressed Up) and (2) dating application used (OKCupid, Tinder).
+
+Participants consented to be in their study after setting up their first date using either OKCupid or Tinder (this variable could not be randomly assigned). Upon meeting inclusion criteria and joining the study, the dating expert randomly assigned each participant to one of the three attire conditions.
+
+The research question was: Does first-date satisfaction differ interactively when considering dating attire and the mobile application used?
+
+#### Factorial ANOVA | Data
+
+```{r message = FALSE, warning = FALSE}
+library(psych)
+library(tidyverse)
+library(jmv)
+library(ggpubr)
+library(apaTables)
+library(ez)
+library(rstatix)
+
+dat_date <- read.csv("FACTORIAL_DEMO.csv")
+
+# Set IVs to factors using as.factor() or factor() 
+dat_date$Application<-as.factor(dat_date$Application)
+dat_date$Outfit<-as.factor(dat_date$Outfit)
+
+# Assess number of participants and variables in data set
+dim(dat_date)
+head(dat_date,4)
+```
+
+#### Factorial ANOVA | Descriptive Stats
+
+```{r}
+
+# Descriptive Stats
+describeBy(dat_date$Satisfaction, 
+           list(dat_date$Outfit,dat_date$Application),       
+           mat=TRUE)              
+
+```
+
+
+#### Factorial ANOVA | Histogram
+
+```{r }
+library(ggplot2)
+ggplot(data = dat_date,
+       mapping = aes(x = Satisfaction)) +
+  geom_histogram(bins = 8, color = "steelblue") +
+  labs(y = "Count", x = "Satisfaction")+
+  facet_wrap(~dat_date$Outfit+dat_date$Application)
+
+```
+
+
+#### Factorial ANOVA | Histogram
+
+```{r}
+
+ggplot(data = dat_date,
+       mapping = aes(x = Satisfaction)) +
+  geom_histogram(bins = 8, color = "steelblue") +
+  labs(y = "Count", x = "Satisfaction")+
+  facet_wrap(dat_date$Application,ncol=1)
+
+```
+
+
+#### Factorial ANOVA | Boxplot
+
+```{r}
+
+ggplot(data = dat_date,
+       mapping = aes(y = Satisfaction, x = Outfit)) +
+  geom_boxplot() +
+    labs(y = "Date Satisfaction")
+```
+
+
+#### Factorial ANOVA | Boxplot
+
+```{r }
+
+ggplot(data = dat_date,
+       mapping = aes(y = Satisfaction, x = Application)) +
+  geom_boxplot() +
+    labs(y = "Date Satisfaction")
+
+```
+
+
+#### Factorial ANOVA | Violin Plot
+
+```{r}
+
+ggplot(data = dat_date,
+       aes(x = Application, y = Satisfaction, 
+           fill = Application))+
+  geom_violin(show.legend=FALSE)+
+  ylab("Date Satisfaction")+
+  xlab("Application")+
+  scale_fill_manual(values=c("#D55e00","#56B4E9","#009E73"))
+
+```
+
+```{r}
+
+ggplot(data = dat_date,
+       aes(x = Outfit, y = Satisfaction, 
+           fill = Outfit))+
+  geom_violin(show.legend=FALSE)+
+  ylab("Date Satisfaction")+
+  xlab("Outfit")+
+  scale_fill_manual(values=c("#D55e00","#56B4E9","#009E73"))
+
+```
+
+
+#### Factorial ANOVA | Violin Plot
+
+```{r}
+
+ggplot(data = dat_date,
+       aes(x = Outfit, y = Satisfaction, 
+           fill = Application))+
+  geom_violin(show.legend=TRUE)+
+  ylab("Date Satisfaction")+
+  xlab("Outfit")+
+  scale_fill_manual(values=c("#D55e00","#56B4E9","#009E73"))
+
+```
+
+
+#### Factorial ANOVA | ANOVA() Omnibus Assumption Checks
+
+```{r}
+
+# Omnibus Assumption Checking
+ANOVA(data = dat_date, 
+      dep = 'Satisfaction',             
+      factors = c('Application','Outfit'),
+      homo = TRUE,                      
+      norm = TRUE,                      
+      qq = TRUE)      
+
+```
+
+#### Factorial ANOVA | Group Level Assumption Checks
+
+```{r}
+
+dat_date %>%                    
+  group_by(Application,Outfit) %>%  
+  shapiro_test(Satisfaction)    
+
+```
+
+#### Factorial ANOVA | Group Level Assumption Checks
+
+```{r}
+
+ggqqplot(dat_date,                   
+         'Satisfaction',             
+         facet.by = c("Application","Outfit"))  
+
+```
+
+#### Factorial ANOVA | Group Level Assumption Checks
+
+```{r}
+# If you have not already turned your variables into factors you need to do so before this step!
+
+dat_date %>%   
+  levene_test(Satisfaction ~ Application*Outfit, 
+              center = mean) 
+
+```
+
+#### Factorial ANOVA | Conducting the ANOVA
+
+```{r}
+options(digits = 3)
+ANOVA(data = dat_date,                    
+      dep = 'Satisfaction',               
+      factors = list('Application','Outfit'),  
+      effectSize = 'partEta',             
+      postHoc = ~Outfit + Application:Outfit, 
+      postHocCorr = 'bonf',
+      postHocES = 'd',   
+      postHocEsCi = TRUE,
+      emMeans = ~Application + Outfit + Application:Outfit,         
+      emmPlots = TRUE,
+      emmPlotData = TRUE,
+      emmTables = TRUE)                   
+
+```
+
+#### Factorial ANOVA | ANOVA Output: Interaction Simple Effects Code
+
+```{r}
+model <- lm(Satisfaction~Application*Outfit, dat_date)
+# Effect of Outfit across each Application
+# When statistically significant interaction occurs we assess simple effects
+one.way <- dat_date %>%                 
+  group_by(Outfit) %>%                  
+  anova_test(dv = Satisfaction,         
+             between = Application,
+             error = model)%>%  
+  get_anova_table() %>%                 
+  adjust_pvalue(method = "bonferroni")  
+one.way 
+
+one.way2 <- dat_date %>%                 
+  group_by(Application) %>%                  
+  anova_test(dv = Satisfaction,         
+             between = Outfit,
+             error = model)%>%  
+  get_anova_table() %>%                 
+  adjust_pvalue(method = "bonferroni")  
+one.way2
+
+```
+
+The simple main effect of Outfit on date satisfaction was statistically significant for both OKCupid and Tinder users (*p* < .001). In other words, there was a statistically significant difference in mean date satisfaction scores between OKCupid users based on date attire [*F*(2,114) = 37.07, *p* < .001]. And the same conclusion holds true for Tinder users [*F*(2,114) = 33.07, *p* < .001].
+
+#### Factorial ANOVA | Professional ANOVA Visualization Code
+
+```{r}
+
+# Generates Marginal Means for Visualization
+pwc <- dat_date %>%
+  group_by(Application) %>%                               
+  emmeans_test(Satisfaction~Outfit,                 
+               p.adjust.method = "bonferroni") %>%   
+  add_xy_position(x = "Application")                      
+
+pwc
+
+pwc2 <- dat_date %>%
+  group_by(Outfit) %>%                               
+  emmeans_test(Satisfaction~Application,                 
+               p.adjust.method = "bonferroni") %>%   
+  add_xy_position(x = "Outfit")                      
+
+pwc2
+
+```
+
+There were statistically significant differences in date satisfaction between all groups for both OKCupid and Tinder users (*p*s < .05 when adjusted using Bonferroni correction).
+
+#### Factorial ANOVA | Professional ANOVA Visualization Code
+
+```{r}
+
+ggboxplot(dat_date,                            
+          x = "Application",                       
+          y = "Satisfaction",                 
+          color = "Outfit") +               
+  stat_pvalue_manual(pwc,                     
+                     hide.ns = FALSE,
+                     tip.length = 0) +       
+  labs(                                       
+    caption = get_pwc_label(pwc),            
+    y = "Date Satisfaction",
+    x = "Application Used")
+
+
+ggboxplot(dat_date,                            
+          x = "Outfit",                       
+          y = "Satisfaction",                 
+          color = "Application") +               
+  stat_pvalue_manual(pwc2,                     
+                     hide.ns = FALSE,
+                     tip.length = 0) +       
+  labs(                                       
+    caption = get_pwc_label(pwc2),            
+    y = "Date Satisfaction",
+    x = "Outfit Worn")
+```
+
+#### Factorial ANOVA | Saving the ANOVA Model Object
+
+```{r}
+
+aovm3<-ANOVA(data = dat_date,                    
+      dep = 'Satisfaction',               
+      factors = list('Application','Outfit'),  
+      effectSize = 'partEta',             
+      postHoc = ~Outfit, 
+      postHocCorr = 'bonf',
+      postHocES = 'd',   
+      postHocEsCi = TRUE,
+      emMeans = ~Application + Outfit + Application:Outfit,         
+      emmPlots = TRUE,
+      emmPlotData = TRUE,
+      emmTables = TRUE)$model
+
+```
+
+#### Factorial ANOVA | APA Style ANOVA Tables
+
+```{r}
+
+apa.aov.table(aovm3,
+              table.number=5,
+              conf.level=.95,
+              filename = "FactorialANOVA.doc")
+
+#Generate Marginal Means Table
+apa.2way.table(Outfit,
+               Application,                      
+               Satisfaction,
+               dat_date,    
+               table.number=6,
+               show.conf.interval = TRUE)
+```

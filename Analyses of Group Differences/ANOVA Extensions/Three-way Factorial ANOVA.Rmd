@@ -1,0 +1,208 @@
+---
+title: "Three-way Factorial Analysis of Variance Tutorial"
+author: "Professor Christopher J. Schmank"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+**Research Context**:
+
+A Psycho-pharmacology firm has hired you to be their data analyst and provided you with a data set that consists of two demographic variables, a treatment variable, and current patient cholesterol ratings. The data set (`dat3`) contains five variables:
+
+- `id` --- Participant identification number  
+- `gender` --- Demographic variable with two levels (`male` and `female`)  
+- `risk` --- Demographic variable with two levels (`low` --- Low risk for heart attack and `high` --- High risk for heart attack)
+- `drug` --- Treatment variable with three levels (`A` --- Placebo Treatment; `B` --- Niacin Treatment; and `C` --- Plant Sterol Treatment)
+- `cholesterol` --- Amount of cholesterol detected 
+
+The goal for this first research question was: Does participants gender, risk, and treatment interactively impact cholesterol? 
+
+```{r message = FALSE, warning = FALSE}
+library(psych)
+library(tidyverse)
+library(jmv)
+library(ggpubr)
+library(apaTables)
+library(ez)
+library(rstatix)
+
+dat <- read.csv("anova3.csv")
+dat2 <- read.csv("anova3.csv")
+
+dat$gender<-factor(dat$gender, labels = c("Female","Male"))
+dat$risk<-factor(dat$risk, labels = c("High", "Low"))
+dat$drug <- factor(dat$drug, labels = c("Placebo", "Niacin", "Plant Sterol"))
+```
+
+#### Factorial ANOVA | Descriptive Stats
+
+```{r}
+# Descriptive Stats
+
+describeBy(dat$cholesterol, 
+           list(dat$gender,dat$risk,dat$drug),       
+           mat=TRUE) 
+
+```
+
+#### Factorial ANOVA | Histogram
+
+```{r }
+ggplot(data = dat,
+       mapping = aes(x = cholesterol)) +
+  geom_histogram(bins = 8, color = "maroon4") +
+  labs(y = "Count", x = "Cholesterol")+
+  facet_wrap(~dat$gender+dat$risk+dat$drug, ncol =3)
+```
+
+#### Factorial ANOVA | Boxplot
+
+```{r}
+
+ggplot(data = dat,
+       mapping = aes(y = cholesterol, x = gender)) +
+  geom_boxplot() +
+    labs(y = "Cholesterol",
+         x = "Gender")
+```
+
+
+#### Factorial ANOVA | Boxplot
+
+```{r }
+
+ggplot(data = dat,
+       mapping = aes(y = cholesterol, x = drug, group = risk)) +
+  geom_boxplot() +
+    labs(y = "Cholesterol",
+         x = "Treatment")+
+  facet_wrap(c("risk", "gender"))
+
+```
+
+
+#### Factorial ANOVA | ANOVA() Omnibus Assumption Checks
+
+```{r}
+
+# Omnibus Assumption Checking
+ANOVA(data = dat, 
+      dep = 'cholesterol',             
+      factors = c('gender','risk', 'drug'),
+      homo = TRUE,                      
+      norm = TRUE,                      
+      qq = TRUE)      
+
+```
+
+#### Factorial ANOVA | Group Level Assumption Checks
+
+```{r}
+# Normality Assessment
+model  <- lm(cholesterol ~ gender*risk*drug, data = dat)
+# Create a QQ plot of residuals
+ggqqplot(residuals(model))
+# Compute Shapiro-Wilk test of normality
+shapiro_test(residuals(model))
+
+# Normality by groups
+dat %>%
+  group_by(gender, risk, drug) %>%
+  shapiro_test(cholesterol)
+
+ggqqplot(dat, 
+         "cholesterol", 
+         ggtheme = theme_bw()) +
+  facet_grid(gender + risk ~ drug, 
+             labeller = "label_both")
+
+dat %>%   
+  levene_test(cholesterol ~ gender*risk*drug, 
+              center = mean) 
+
+```
+
+#### Factorial ANOVA | Conducting the ANOVA
+
+```{r}
+# Between-Subject Factorial ANOVA (jmv)
+ANOVA(data = dat,                    
+      dep = 'cholesterol',               
+      factors = list('gender','risk','drug'),  
+      effectSize = 'partEta',             
+      postHoc = ~drug + drug:gender + gender:risk:drug, 
+      postHocCorr = 'bonf',
+      postHocES = 'd',   
+      postHocEsCi = TRUE,
+      emMeans = ~gender + risk + drug + drug:risk + drug:gender + drug:gender:risk,         
+      emmPlots = TRUE,
+      emmPlotData = TRUE,
+      emmTables = TRUE)   
+
+# Simple two-way interaction effect check Risk and Drug across Gender
+model <- lm(cholesterol~drug*gender*risk, dat)
+
+sie.check <- dat %>%                 
+  group_by(risk) %>%                  
+  anova_test(dv = cholesterol,         
+             between = c(gender,drug),
+             error = model)%>%  
+  get_anova_table() %>%                 
+  adjust_pvalue(method = "bonferroni")  
+sie.check
+
+# Simple simple main effects
+ssme.check <- dat %>%
+  group_by(gender,risk) %>% 
+  anova_test(dv = cholesterol,         
+             between = drug,
+             error = model)%>%
+  get_anova_table() %>%                 
+  adjust_pvalue(method = "bonferroni")  
+ssme.check
+```
+
+#### Factorial ANOVA Visualization
+
+```{r}
+pwc <- dat %>%
+  group_by(gender, risk) %>%
+  emmeans_test(cholesterol ~ drug, p.adjust.method = "bonferroni")
+pwc
+
+```
+```{r}
+pwc %>% filter(gender == "Male", risk == "High")
+
+get_emmeans(pwc) %>% filter(gender == "Male", risk == "High")
+
+```
+
+```{r}
+pwc <- pwc %>% add_xy_position(x = "drug")
+pwc.filtered <- pwc %>% filter(gender == "Male", risk == "High")
+
+ggboxplot(dat,
+          x = "drug", 
+          y = "cholesterol",
+          color = "risk", 
+          palette = "grey", 
+          facet.by = "gender") +
+  stat_pvalue_manual(pwc.filtered, 
+                     color = "risk", 
+                     hide.ns = TRUE,
+                     tip.length = 0, 
+                     step.increase = 0.1, 
+                     step.group.by = "gender") +
+  labs(x = "Drug Treatment Provided",
+       y = "Cholesterol",
+       color = "Risk of Heartattack",
+       caption = get_pwc_label(pwc))
+
+
+```
+
