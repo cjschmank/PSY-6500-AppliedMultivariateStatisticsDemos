@@ -1,0 +1,346 @@
+---
+title: "Confirmatory Structure Analysis Demonstration"
+author: "Professor Christopher S. Schmank"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message=FALSE, warning = FALSE}
+library(lavaan)
+library(lavaanPlot)
+library(jmv)
+library(psych)
+```
+
+#### Load in Data
+
+```{r}
+wiscsem <- read.csv("wiscsem.csv")[,-c(1:2,13)]
+cogability <- read.csv("cogability.csv")[,c(2:10)]
+```
+
+#### Descriptive Statistics
+
+```{r}
+describe(wiscsem)
+describe(cogability)
+```
+
+#### `CorrMatrix()` output
+
+```{r}
+corrMatrix(wiscsem,plots = TRUE,plotDens = TRUE,plotStats = TRUE)$plot
+corrMatrix(cogability,plots = TRUE,plotDens = TRUE,plotStats = TRUE)$plot
+```
+
+### Confirmatory Factor Analysis (CFA)
+
+#### Model Specification (i.e., Measurement Model)
+
+One-factor Model:
+```{r}
+onefactor <- ' # Latent variable
+g =~ info + comp + arith + simil + vocab + digit + pictcomp + parang + block + object
+
+# Residuals for manifest variables
+info~~info
+comp~~comp
+arith~~arith
+simil~~simil
+vocab~~vocab
+digit~~digit
+pictcomp~~pictcomp
+parang~~parang
+block~~block
+object~~object
+
+# Variances for latent variables
+g~~1*g
+'
+
+```
+
+Two-factor (Uncorrelated) Model:
+```{r}
+twofactor <- ' # Latent variables
+verbal =~ info + comp + arith + simil + vocab + digit
+performance =~ pictcomp + parang + block + object
+
+# Residuals for manifest variables
+info~~info
+comp~~comp
+arith~~arith
+simil~~simil
+vocab~~vocab
+digit~~digit
+pictcomp~~pictcomp
+parang~~parang
+block~~block
+object~~object
+
+# Variances for latent variables
+verbal~~1*verbal
+performance~~1*performance
+'
+
+```
+
+Two-factor (Correlated) Model:
+```{r}
+ctwofactor <- ' # Latent variables
+verbal =~ info + comp + arith + simil + vocab + digit
+performance =~ pictcomp + parang + block + object
+
+# Latent variable correlation
+verbal ~~ performance
+
+# Residuals for manifest variables
+info~~info
+comp~~comp
+arith~~arith
+simil~~simil
+vocab~~vocab
+digit~~digit
+pictcomp~~pictcomp
+parang~~parang
+block~~block
+object~~object
+
+# Variances for latent variables
+verbal~~1*verbal
+performance~~1*performance
+'
+
+```
+
+## Run the model, summarize the parameter estimates, and plot: 
+
+```{r message=FALSE, warning=FALSE}
+# Run the model: One Factor Model
+fit <- lavaan(onefactor, 
+              data = wiscsem, 
+              std.lv = TRUE)
+
+# Get parameter estiamtes and fit statistics 
+summary(fit, 
+        fit.measures = TRUE, 
+        standardized = TRUE)
+
+lavaanPlot(fit, 
+           coefs = TRUE, 
+           stand = TRUE)
+```
+
+```{r message=FALSE, warning=FALSE}
+# Run the model: Two Factor Model
+fit2 <- lavaan(twofactor, 
+               data = wiscsem, 
+               std.lv = TRUE)
+
+# Get parameter estiamtes and fit statistics 
+summary(fit2, 
+        fit.measures = TRUE, 
+        standardized = TRUE)
+
+lavaanPlot(fit2, 
+           coefs = TRUE, 
+           stand = TRUE)
+```
+
+```{r message=FALSE, warning=FALSE}
+# Run the model: Two Factor Model
+fit2c <- lavaan(ctwofactor, 
+                data = wiscsem, 
+                std.lv = TRUE)
+
+# Get parameter estiamtes and fit statistics 
+summary(fit2c, 
+        fit.measures = TRUE, 
+        standardized = TRUE)
+
+lavaanPlot(fit2c, 
+           coefs = TRUE, 
+           stand = TRUE,
+           covs = TRUE)
+```
+
+## Direct Model Fit Comparisons (Chi-square Difference Test)
+
+```{r}
+# Can compare fit of our 2-factor models because they are nested (same items) AND one has fewer degrees of freedom
+anova(fit2,fit2c)
+
+anova(fit, fit2c)
+
+# Then we can call for the summary of the "best" model and the model fit indices
+summary(fit2c, 
+        fit.measures = TRUE, 
+        standardized = TRUE)
+
+fitMeasures(fit2c)
+```
+
+### Structural Equation Model
+
+#### Model Specification (Step 1 SEM: Measurement Model)
+
+Correlated Three Factor Model:
+```{r}
+cthreefactor <- ' # Latent variables
+Fluid =~ V1 + V2 + V3
+Verbal =~ V4 + V5 + V6
+Visuospatial =~ V7 + V8 + V9
+
+# Latent variable correlation
+Fluid ~~ Verbal
+Fluid ~~ Visuospatial
+Verbal ~~ Visuospatial
+
+# Residuals for manifest variables
+V1 ~~ V1
+V2 ~~ V2
+V3 ~~ V3
+V4 ~~ V4
+V5 ~~ V5
+V6 ~~ V6
+V7 ~~ V7
+V8 ~~ V8
+V9 ~~ V9
+
+# Variances for latent variables
+Fluid~~1*Fluid
+Verbal~~1*Verbal
+Visuospatial~~1*Visuospatial
+'
+```
+
+## Model Specification (Step 2 SEM: Full Structural Model)
+
+Fluid Intelligence Predicts Verbal/Visuospatial Model:
+```{r}
+gfpredicts <- ' # Latent variables
+Fluid =~ V1 + V2 + V3
+Verbal =~ V4 + V5 + V6
+Visuospatial =~ V7 + V8 + V9
+
+# Regressions
+
+Verbal + Visuospatial ~ Fluid
+
+# Residuals for manifest variables
+V1 ~~ V1
+V2 ~~ V2
+V3 ~~ V3
+V4 ~~ V4
+V5 ~~ V5
+V6 ~~ V6
+V7 ~~ V7
+V8 ~~ V8
+V9 ~~ V9
+
+# Variances for latent variables
+Fluid~~1*Fluid
+Verbal~~1*Verbal
+Visuospatial~~1*Visuospatial
+'
+```
+
+Fluid Intelligence Predicts Verbal/Visuospatial Correlated Model:
+```{r}
+gfpredictsc <- ' # Latent variables
+Fluid =~ V1 + V2 + V3
+Verbal =~ V4 + V5 + V6
+Visuospatial =~ V7 + V8 + V9
+
+# Correlated Latent variables
+Verbal ~~ Visuospatial
+
+# Regressions
+
+Verbal + Visuospatial ~ Fluid
+
+# Residuals for manifest variables
+V1 ~~ V1
+V2 ~~ V2
+V3 ~~ V3
+V4 ~~ V4
+V5 ~~ V5
+V6 ~~ V6
+V7 ~~ V7
+V8 ~~ V8
+V9 ~~ V9
+
+# Variances for latent variables
+Fluid~~1*Fluid
+Verbal~~1*Verbal
+Visuospatial~~1*Visuospatial
+'
+```
+
+## Run the CFA measurement model, summarize the parameter estimates, and plot 
+
+```{r message=FALSE, warning=FALSE}
+# Run the model: Three Factor Model
+cfafit <- lavaan(cthreefactor, 
+                 data = cogability, 
+                 std.lv = TRUE)
+
+# Get parameter estiamtes and fit statistics 
+summary(cfafit, 
+        fit.measures = TRUE, 
+        standardized = TRUE)
+
+lavaanPlot(cfafit, 
+           coefs = TRUE, 
+           stand = TRUE,
+           covs = TRUE)
+```
+
+## Run the SEM model(s), summarize the parameter estimates, and plot 
+
+```{r message=FALSE, warning=FALSE}
+# Run the model: Gf Predicts SEM
+semfit <- lavaan(gfpredicts, 
+                 data = cogability, 
+                 std.lv = TRUE)
+
+# Get parameter estiamtes and fit statistics 
+summary(semfit, 
+        fit.measures = TRUE, 
+        standardized = TRUE)
+
+lavaanPlot(semfit, 
+           coefs = TRUE, 
+           stand = TRUE,
+           covs = TRUE)
+```
+
+
+```{r message=FALSE, warning=FALSE}
+# Run the model: Gf Predicts Correlated SEM
+semfitc <- lavaan(gfpredictsc, 
+                 data = cogability, 
+                 std.lv = TRUE)
+
+# Get parameter estiamtes and fit statistics 
+summary(semfitc, 
+        fit.measures = TRUE, 
+        standardized = TRUE)
+
+lavaanPlot(semfitc, 
+           coefs = TRUE, 
+           stand = TRUE,
+           covs = TRUE)
+```
+
+#### Direct Model Fit Comparisons (Chi-square Difference Test)
+
+```{r}
+# Can compare fit of our 2-factor models because they are nested (same items) AND one has fewer degrees of freedom
+anova(semfit,semfitc)
+```
+
