@@ -1,0 +1,472 @@
+---
+title: "Data Screening and Cleaning Walkthrough"
+author: "Christopher J. Schmank, PhD"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### **Load/Install Required R Packages**
+
+```{r, echo = TRUE, warning = FALSE, message = FALSE}
+# install.packages("tidyverse", dependencies = TRUE)
+# install.packages("psych", dependencies = TRUE)
+# install.packages("mice", dependencies = TRUE)
+# install.packages("psych", dependencies = TRUE)
+# install.packages("lmtest", dependencies = TRUE)
+# install.packages("jmv", dependencies = TRUE)
+# install.packages("MVN", dependencies = TRUE)
+# install.packages("naniar", dependencies = TRUE)
+
+library(mice)
+library(naniar)
+library(lmtest)
+library(jmv)
+library(MVN)
+library(psych)
+library(tidyverse)
+```
+
+---
+
+### **Steps to Data Screening and Cleaning**
+
+1. Start with traditional Exploratory Data Analysis 
+    (a) Eyeball Check
+    (b) Univariate Statistics Descriptions
+    (c) Data Visualizations 
+1. Evaluate presence/pattern of missing data and impute data if necessary
+1. Assess linearity and homoscedasticity (i.e., variance sameness assessments)
+1. Assess normality and univariate outliers
+1. Assess/identify multivariate outliers
+1. Assess multicollinearity and singularity
+
+---
+
+### Start with traditional EDA: 1a
+
+#### **General Data Importing Template:**
+
+```{r import_data, echo=TRUE}
+dat <- read.csv('tutorial_data.csv')
+# View(dat)
+
+head(dat, 20)
+```
+
+#### **In Your R Environment Uncomment and Run the Following Lines of Code:**
+
+```{r extra_data, echo=TRUE}
+# View(cattell)
+# View(attitude)
+# View(nhanes)
+```
+
+- What do you make of these data files? 
+- Are they tidy? If not, what would make them tidy?
+- Do any of them have missing data?
+- Would any of them be problematic for EDA? Why or Why not?
+
+---
+
+### Start with traditional EDA: 1b
+
+```{r descriptives, echo = TRUE}
+describe(dat[3:11])
+describe(attitude)
+describe(nhanes)
+```
+
+```{r grouped_descriptives, echo = TRUE}
+dat$AgeGroup <- factor(dat$AgeGroup,
+                       levels = c(1, 3),
+                       labels = c("Younger Adults", "Older Adults"))
+
+describeBy(dat[2:11],
+           group = dat$AgeGroup,
+           digits = 3)
+
+# OR can set mat = TRUE with dplyr::arrange()
+
+describeBy(dat[2:11],
+           group = dat$AgeGroup,
+           digits = 3,
+           mat = TRUE) %>% 
+  arrange(desc(group1))
+
+```
+
+---
+
+### Start with traditional EDA: 1c
+
+Remember to make these visualizations as "publishable" as possible using layers:
+
+- change axis names using labs()
+- add colors 
+- change themes... etc.
+
+```{r viz, echo = TRUE}
+
+# Boxplot Visualization
+ggplot(data = dat,
+       mapping = aes(y = Prop_RAPM)) +
+  geom_boxplot()
+
+# Histogram Visualization
+ggplot(data = dat,
+       mapping = aes(x = Prop_RAPM)) +
+  geom_histogram(bins = 8)
+
+# Scatterplot Visualization
+# Raven's x General Information
+ggplot(data = dat, 
+       mapping = aes(x = Prop_RAPM,
+                     y = Prop_GI)) + 
+  geom_point() +
+  geom_smooth(formula = "y ~ x",
+              method = "lm")
+
+```
+
+---
+
+### Evaluate presence/pattern of missing data (impute data if necessary)
+
+**Evaluation of Missing Data: Amount and Pattern**
+
+```{r amt_missing, echo=TRUE}
+# Calculate Amount of Missing Data
+sum(is.na(dat))/prod(dim(dat)) # No missing data present
+
+sum(is.na(nhanes))/prod(dim(nhanes)) # 27% data missing
+```
+```{r pattern_missing, echo=TRUE}
+# Generate Missing Data Pattern
+md.pattern(dat,
+           rotate.names = TRUE)
+
+md.pattern(nhanes,
+           rotate.names = TRUE)
+
+# This pattern indicates that there are 7 distinct patterns of missingness in the nhanes data
+# 13 participants have no missing data at all
+# 3 participants are only missing cholesterol data
+# 1 participant is missing BMI data
+# 1 participant is missing a value for `hyp` and BMI 
+# 7 participants are missing all variables except for age
+```
+
+```{r mcar_test, echo=TRUE}
+# Little's MCAR test can be used to assess missingness
+# H0: Data is MCAR --- do not want to reject (i.e., p > .05!!)
+
+mcar_test(nhanes) 
+mcar_test(airquality)
+```
+
+For those of your interested in using `mice` for imputation purposes see the following tutorials available online:
+
+[mice website](https://amices.org/mice/)
+
+[Click here for walkthrough tutorial](https://rmisstastic.netlify.app/tutorials/reiter_course_multipleimputationoverview_2018/reiter_script_multipleimputationmice_2018)   
+
+[Click here for online missing data textbook](https://stefvanbuuren.name/fimd/ch-multivariate.html)
+
+---
+
+### Assess linearity and homoscedasticity (i.e., variance sameness assessments)
+
+#### Linearity: Correlation Matrices w/ Plots
+
+For the sake of the next few steps, let's say we are interested in a statistical model that attempts to predict Raven's Progressive Matrices scores (`Prop_RAPM`) from Age, WMC (`Total_WMC`), and Processing Speed (`Prop_DSST_2`).
+
+```{r corrMatrix, echo = TRUE}
+corrMatrix(dat[c(3,8:9,11)],
+           ci = TRUE,
+           plots = TRUE,
+           plotDens = TRUE,
+           plotStats = TRUE)
+```
+
+#### Homoscedasticity
+
+```{r homoscedasticity, echo = TRUE}
+# The Breusch-Pagan test can be used to assess homoscedasticity
+# H0: Data is homoscedastic --- do not want to reject (i.e., p > .05!!)
+
+# Create Linear Model
+lm <- lm(Prop_RAPM ~ Age + Total_WMC + Prop_DSST_2, dat)
+
+# Breusch-Pagan Test
+bptest(lm, varformula = ~fitted.values(lm), studentize=FALSE)
+
+# Studentized Breusch-Pagan Test is a more conservative option
+bptest(lm, varformula = ~fitted.values(lm), studentize=TRUE)
+
+```
+---
+
+### Assess univariate normality and outliers
+
+#### Univariate Outliers
+
+```{r univariate_outliers, echo = TRUE}
+# Counts number of values greater than z = +/-3.29, p = .001
+
+# Will want to run this for ALL variables to be entered into statistical model
+
+dat[abs(scale(dat$Prop_RAPM)) > 3.29, ]
+dat[abs(scale(dat$Age)) > 3.29, ]
+dat[abs(scale(dat$Total_WMC)) > 3.29, ]
+dat[abs(scale(dat$Prop_DSST_2)) > 3.29, ]
+ 
+# The above lines of code indicates that there were no univariate outliers among those variables
+```
+
+```{r univariate_outlier_ex, echo = TRUE}
+
+# If outliers are present it will list each outlier for that variable in the data frame (with all other data for the cases)
+
+dat[abs(scale(dat$Affect_Baseline)) > 3.29, ]
+
+# To create a new data object WITHOUT the univariate outlier indicated use the code below
+
+dat_no_uni <- dat[!abs(scale(dat$Affect_Baseline)) > 3.29, ]
+
+# The ! selects all of the data that DOES NOT have a z-score more extreme than 3.29
+
+```
+
+
+#### Univariate Normality
+
+Best way to assess univariate normality is:
+
+- Check histograms and box-plot visualizations
+- Assess levels of skewness/kurtosis
+    - Skewness values more extreme than $\pm 3.00$ (Liberal) OR $\pm 1.00$ (Conservative)
+    - Kurtosis values more extreme than $\pm 10.00$ (Liberal) OR $\pm 1.00$ (Conservative)
+- Good practice to do so AFTER removal of univariate outliers
+
+---
+
+### Assess/identify multivariate outliers and normality
+
+Important to use updated data frame IFF univariate outliers present among variables of interest---since there were no outliers in the variables we are using in our current statistical model we will continue using the `dat` data frame
+
+#### Multivariate Outlier Assessment
+
+```{r mv_outliers, echo = TRUE}
+dat$mahalZ <- scale(outlier(dat[c(3,8:9,11)]))
+
+dat[abs(dat$mahalZ) > 3.29, ] # 3 Multivariate outliers indicated (ID 43, 99, 254)
+
+dat$cookZ <- scale(cooks.distance(lm))
+
+dat[abs(dat$cookZ) > 3.29, ] # 2 Multivariate outliers indicated (ID 43, 99)
+
+```
+```{r mv_outliers_rm, echo = TRUE}
+# Two IDs are shared across both multivariate outlier assessments, but to be safe lets remove all of them that were indicated
+
+dat_no_mvout <- dat[!abs(dat$mahalZ) > 3.29, ] # 3 Multivariate outliers removed (ID 43, 99, 254)
+
+```
+
+```{r mv_outliers2, echo = TRUE}
+dat_no_mvout$mahalZ <- scale(outlier(dat_no_mvout[c(3,8:9,11)]))
+
+dat_no_mvout[abs(dat_no_mvout$mahalZ) > 3.29, ] # 0 Multivariate outliers indicated 
+
+lm2 <- lm(Prop_RAPM ~ Age + Total_WMC + Prop_DSST_2, dat_no_mvout)
+
+dat_no_mvout$cookZ <- scale(cooks.distance(lm2))
+
+dat_no_mvout[abs(dat_no_mvout$cookZ) > 3.29, ] # 3 Multivariate outliers indicated (ID 80, 239, 261)
+
+```
+
+```{r mv_outliers_rm2, echo = TRUE}
+# Let's remove the three IDs indicated by the previous Cook's Distance assessment
+
+dat_no_mvout2 <- dat_no_mvout[!abs(dat_no_mvout$cookZ) > 3.29, ] # 3 Multivariate outliers removed (ID 80, 239, 261)
+
+```
+
+```{r mv_outliers3, echo = TRUE}
+dat_no_mvout2$mahalZ <- scale(outlier(dat_no_mvout2[c(3,8:9,11)]))
+
+dat_no_mvout2[abs(dat_no_mvout2$mahalZ) > 3.29, ] # 0 Multivariate outliers indicated
+
+lm3 <- lm(Prop_RAPM ~ Age + Total_WMC + Prop_DSST_2, dat_no_mvout2)
+
+dat_no_mvout2$cookZ <- scale(cooks.distance(lm3))
+
+dat_no_mvout2[abs(dat_no_mvout2$cookZ) > 3.29, ] # 2 Multivariate outliers indicated (ID 3, 271)
+
+```
+
+```{r mv_outliers_rm3, echo = TRUE}
+# Again, we can remove those ID's indicated by Cook's Distance
+
+dat_no_mvout3 <- dat_no_mvout2[!abs(dat_no_mvout2$cookZ) > 3.29, ] # 2 Multivariate outliers removed (ID 3, 271)
+
+```
+
+```{r mv_outliers4, echo = TRUE}
+dat_no_mvout3$mahalZ <- scale(outlier(dat_no_mvout3[c(3,8:9,11)]))
+
+dat_no_mvout3[abs(dat_no_mvout3$mahalZ) > 3.29, ] # 0 Multivariate outliers indicated
+
+lm4 <- lm(Prop_RAPM ~ Age + Total_WMC + Prop_DSST_2, dat_no_mvout3)
+
+dat_no_mvout3$cookZ <- scale(cooks.distance(lm4))
+
+dat_no_mvout3[abs(dat_no_mvout3$cookZ) > 3.29, ] # 2 Multivariate outliers indicated (ID 192, 281)
+
+```
+
+```{r mv_outliers_rm4, echo = TRUE}
+# Again, we can remove those ID's indicated by Cook's Distance
+
+dat_no_mvout4 <- dat_no_mvout3[!abs(dat_no_mvout3$cookZ) > 3.29, ] # 2 Multivariate outliers removed (ID 192, 281)
+
+```
+
+```{r mv_outliers5, echo = TRUE}
+dat_no_mvout4$mahalZ <- scale(outlier(dat_no_mvout4[c(3,8:9,11)]))
+
+dat_no_mvout4[abs(dat_no_mvout4$mahalZ) > 3.29, ] # 1 Multivariate outlier indicated (ID 279)
+
+lm5 <- lm(Prop_RAPM ~ Age + Total_WMC + Prop_DSST_2, dat_no_mvout4)
+
+dat_no_mvout4$cookZ <- scale(cooks.distance(lm5))
+
+dat_no_mvout4[abs(dat_no_mvout4$cookZ) > 3.29, ] # 2 Multivariate outliers indicated (ID 115, 274)
+
+```
+
+```{r mv_outliers_rm5, echo = TRUE}
+# Now, we will remove all ID's indicated by Mahalanobis and Cook's Distance
+
+dat_no_mvout5 <- dat_no_mvout4[!abs(dat_no_mvout4$cookZ) > 3.29, ] # 2 Multivariate outliers removed (ID 115, 274)
+dat_no_mvout5 <- dat_no_mvout5[!abs(dat_no_mvout5$mahalZ) > 3.29, ] # 1 Multivariate outliers removed (ID 279)
+
+```
+
+```{r mv_outliers6, echo = TRUE}
+dat_no_mvout5$mahalZ <- scale(outlier(dat_no_mvout5[c(3,8:9,11)]))
+
+dat_no_mvout5[abs(dat_no_mvout5$mahalZ) > 3.29, ] # 0 Multivariate outliers indicated
+
+lm6 <- lm(Prop_RAPM ~ Age + Total_WMC + Prop_DSST_2, dat_no_mvout5)
+
+dat_no_mvout5$cookZ <- scale(cooks.distance(lm6))
+
+dat_no_mvout5[abs(dat_no_mvout5$cookZ) > 3.29, ] # 2 Multivariate outliers indicated (ID 240, 242)
+
+```
+
+```{r mv_outliers_rm6, echo = TRUE}
+# Now, we will remove all ID's indicated by Mahalanobis and Cook's Distance
+
+dat_no_mvout6 <- dat_no_mvout5[!abs(dat_no_mvout5$cookZ) > 3.29, ] # 2 Multivariate outliers removed (ID 240, 242)
+
+```
+
+```{r mv_outliers7, echo = TRUE}
+dat_no_mvout6$mahalZ <- scale(outlier(dat_no_mvout6[c(3,8:9,11)]))
+
+dat_no_mvout6[abs(dat_no_mvout6$mahalZ) > 3.29, ] # 0 Multivariate outliers indicated
+
+lm7 <- lm(Prop_RAPM ~ Age + Total_WMC + Prop_DSST_2, dat_no_mvout6)
+
+dat_no_mvout6$cookZ <- scale(cooks.distance(lm7))
+
+dat_no_mvout6[abs(dat_no_mvout6$cookZ) > 3.29, ] # 1 Multivariate outlier indicated (ID 23)
+
+```
+
+```{r mv_outliers_rm7, echo = TRUE}
+# Now, we will remove all ID's indicated by Mahalanobis and Cook's Distance
+
+dat_no_mvout7 <- dat_no_mvout6[!abs(dat_no_mvout6$cookZ) > 3.29, ] # 1 Multivariate outlier removed (ID 23)
+
+```
+
+```{r mv_outliers8, echo = TRUE}
+dat_no_mvout7$mahalZ <- scale(outlier(dat_no_mvout7[c(3,8:9,11)]))
+
+dat_no_mvout7[abs(dat_no_mvout7$mahalZ) > 3.29, ] # 0 Multivariate outliers indicated
+
+lm8 <- lm(Prop_RAPM ~ Age + Total_WMC + Prop_DSST_2, dat_no_mvout7)
+
+dat_no_mvout7$cookZ <- scale(cooks.distance(lm8))
+
+dat_no_mvout7[abs(dat_no_mvout7$cookZ) > 3.29, ] # 0 Multivariate outliers indicated
+
+dat2 <- dat_no_mvout7
+```
+
+#### Multivariate Normality Assessment
+
+```{r multivar_normal, echo = TRUE}
+# Doornik-Hansen's Test of Multivariate Normality
+mvn(dat2[c(3,8:9,11)],
+    mvn_test = "doornik_hansen",
+    scale = TRUE,
+    bootstrap = TRUE)$multivariate_normality
+
+# Energy Test of Multivariate Normality
+mvn(dat2[c(3,8:9,11)],
+    mvn_test = "energy",
+    scale = TRUE,
+    bootstrap = TRUE)$multivariate_normality
+
+# Henze-Zirkler's Test of Multivariate Normality
+mvn(dat2[c(3,8:9,11)],
+    mvn_test = "hz",
+    scale = TRUE,
+    bootstrap = TRUE)$multivariate_normality
+
+# Mardia's Test of Multivariate Normality
+mvn(dat2[c(3,8:9,11)],
+    mvn_test = "mardia",
+    scale = TRUE,
+    bootstrap = TRUE)$multivariate_normality
+
+
+# The majority of these tests imply that our data is NOT multivariate normal
+# We would want to make sure to include this information in our write up for transparency
+```
+
+---
+
+### Assess multicollinearity and singularity
+
+#### Multicollinearity Assessment
+
+
+```{r VIF_Tolerance, echo=TRUE}
+linReg(data = dat2,
+       dep = 'Prop_RAPM',
+       covs = c('Age','Total_WMC','Prop_DSST_2'),
+       blocks = list(
+         list('Age','Total_WMC','Prop_DSST_2')), 
+       r = FALSE,
+       r2 = FALSE,
+       collin = TRUE) 
+
+```
+
+#### Determinant Assessment
+
+```{r determinant, echo = TRUE}
+det(cor(dat2[c(3,8:9,11)]))
+```
+
+---
