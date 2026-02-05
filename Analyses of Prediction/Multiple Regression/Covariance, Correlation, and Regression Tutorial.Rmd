@@ -1,6 +1,6 @@
 ---
 title: "Covariance, Correlation, and Regression Tutorial"
-author: "Professor Christopher J. Schmank"
+author: "Christopher J. Schmank, PhD"
 date: "`r Sys.Date()`"
 output: html_document
 ---
@@ -69,11 +69,11 @@ cor.test(~rating + learning, data = attitude)
 cor.test(x=attitude$rating, y=attitude$learning)
 ```
 
-- Provides `*t*-test`, `degrees of freedom`, and `*p*-value` to assess if correlation is statistically significantly different from zero
+- Provides *t*-test, degrees of freedom, and *p*-value to assess if correlation is statistically significantly different from zero
 
-- Provides `correlation coefficient` and `95% confidence interval`
+- Provides correlation coefficient and 95% confidence interval
 
-- Provides type of correlation coefficient calculated (i.e., `Pearson's product-moment correlation`)
+- Provides type of correlation coefficient calculated (i.e., Pearson's product-moment correlation)
 
 **3. For more detail and details needed for publication**: Use `corr.test()` or `corrMatrix`
 
@@ -87,7 +87,7 @@ corrMatrix(attitude,
 **4. If you need to save a correlation matrix for later use**: Use `corr.test()` or `cor()`
 
 ```{r}
-cor_dat <- corr.test(attitude[1:4])
+cor_dat <- psych::corr.test(attitude[1:4])
 
 cor_dat$r # Calls for ONLY the correlation matrix portion of corr.test() output
 
@@ -96,11 +96,15 @@ cor_dat_r <- cor_dat$r # May also want to make an R object for the correlations
 ```
 
 ```{r}
-cor_dat2 <- cor(attitude) # This code creates a similar object as `cor_dat_r` above
+cor_dat2 <- cor(attitude[1:4]) # This code creates a similar object as `cor_dat_r` above
 cor_dat2
+
+# Can even use these objects to do rudimentary matrix algebra
+
+cor_dat_r - cor_dat2
 ```
 
-#### **Creating Correlation Table Document**
+#### Creating Correlation Table Document
 
 The `apaTables` package can be used to create quick correlation matrices and linear regression tables---these can be helpful but are VERY difficult to reformat or make changes to.
 
@@ -108,21 +112,11 @@ Make sure that you know how to create these tables using other programs like Exc
 
 ```{r}
 apa.cor.table(data = attitude[1:4],
-              filename = "attitude-correlation-matrix.doc",
+              # filename = "attitude-correlation-matrix.doc", # Can uncomment this line to create word doc
               table.number = 1)
 ```
 
-#### **Writing Up Correlation**
-
-Can be achieved with three statements:
-
-1. Was correlation statistically significantly different from zero; what was the magnitude and direction (adding confidence intervals is a good practice)?
-1. How does the magnitude compare to correlation cutoff values?
-1. Does result align with predictions/hypotheses?
-
-The correlation between `attitude rating` and `being too critical ratings` was not statistically significantly different from zero, *r*(28) = .16, 95% CI [-.22, .16], *p* = .41. According to criteria provided by Cohen (1988), the size (i.e., magnitude) of this correlation fell above a `weak` correlation, but well below what would be considered `moderate.` The sign of the correlation was `positive`, however the lack of statistical significance implies that this direction is not stable within this sample of data.
-
-#### **Conducting and Writing Up Linear Regression**
+#### Conducting Bivariate Linear Regression
 
 ```{r}
 # Easy coding method requires linear model 
@@ -140,28 +134,26 @@ linReg(attitude,
        blocks = list(
          list("privileges")),
        modelTest = TRUE,
+       ci = TRUE,
        stdEst = TRUE,
        ciStdEst = TRUE)
 
 ```
 
-The linear regression predicting `attitude ratings` from `ratings towards allowing special privileges` indicated that `allowing special privileges` accounted for approximately 18% of the variance in `attitude ratings`, *F*(1,28) = 6.21, *p* = .02, *R^2^* = .182. The unstandardized and standardized regression coefficients were statistically significantly different from zero, *b* = 0.424, $\beta$ = .426 (95% CI [.08, .78]), *t*(29) = 2.49, *p* = .02.The value of these coefficients respectively demonstrate: (1) for every one-unit increase in `allowing special privileges` there was an increase of 0.424 units in `attitude ratings` and (2) for every one standard deviation unit increase in `allowing special privileges` there was an increase of 0.426 standard deviation units in `attitude ratings`.
-
-#### **Creating Regression Table Document**
+#### Creating Regression Table Document
 
 ```{r warning=FALSE, message=FALSE}
-# Generate linear model using
-lm <- lm(rating~privileges, data = attitude)
 
 # Create Word Document with APA style Regression Table
 
 apa.reg.table(lm,
-              filename = "regression_table.doc",
+              # filename = "regression_table.doc", # Can uncomment for word doc
               table.number = 2)
 
+set.seed(13)
 apa.reg.boot.table(lm,
-                   filename = "regression_boot.doc",
+                   # filename = "regression_boot.doc", # Can uncomment for word doc
                    table.number = 2,
-                   number.samples = 1000)
+                   number.samples = 5000)
 ```
 
