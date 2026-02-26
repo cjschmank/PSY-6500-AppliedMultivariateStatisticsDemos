@@ -1,6 +1,6 @@
 ---
 title: 'Multiple Regression Diagnostics and Simultaneous Multiple Regression Tutorial'
-author: "Professor Christopher J. Schmank"
+author: "Christopher J. Schmank, PhD"
 date: "`r Sys.Date()`"
 output: html_document
 ---
@@ -11,11 +11,32 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ### **Multiple Regression Diagnostics Demonstration**
 
+#### **Load in Libraries**
+
+```{r echo = TRUE, warning=FALSE, message=FALSE}
+library(mice)
+library(MVN)
+library(lmtest)
+library(apaTables)
+library(psych)
+library(jmv)
+library(tidyverse)
+```
+
+#### **Load in Data**
+
+```{r echo=TRUE}
+#Load in the data frame into an object `dat`
+
+dat <- read.csv("RegDiagnostics2.csv")
+
+```
+
 #### **Applied Prompt**:
 
-A local resident recently joined their a newly developed charitable giving program and is interested in finding out more about `prosocial behavior` among group members. Without knowing much about the literature, they developed a short survey to give to a nearby school district to find out.
+A local resident recently joined their a newly developed charitable giving program and is interested in finding out more about prosocial behavior among group members. Without knowing much about the literature, they developed a short survey to give to a nearby school district to find out.
 
-    **Research Question**: What influences the amount of money given to a program for community outreach. 
+**Research Question**: What influences the amount of money given to a program for community outreach. 
 
 Ultimately, they must report their findings to their program coordinator and a statistician, who is also on the board.
 
@@ -37,31 +58,6 @@ Ultimately, they must report their findings to their program coordinator and a s
 
 A value of `99` implies that a response was missing for that variable and case
 
-#### **Load in Libraries**
-
-```{r echo = TRUE, warning=FALSE, message=FALSE}
-library(mice)
-library(MVN)
-library(lmtest)
-library(apaTables)
-library(psych)
-library(jmv)
-library(tidyverse)
-```
-
-
-#### **Load in Data**
-
-```{r echo=TRUE}
-#Load in the data frame into an object `dat`
-
-dat <- read.csv("RegDiagnostics2.csv")
-
-#View(dat)
-
-```
-
-
 #### **Change Missing Data Labels**
 
 ```{r echo=TRUE}
@@ -72,16 +68,21 @@ dat[dat=="99"] <- NA
 
 ```
 
-
 ### Exploratory Data Analysis
+
+```{r}
+#View(dat)
+head(dat, 20)
+```
+
 
 #### **Descriptive Statistics**
 ```{r echo=TRUE}
 # Descriptive statistics  (Default: No Removal of Missing Data)
-describe(dat)
+describe(dat[2:6])
 
 # Descriptive statistics  (Removal of Missing Data)
-describe(dat, 
+describe(dat[2:6], 
          na.rm=FALSE)
 
 ```
@@ -117,6 +118,7 @@ ggplot(data = dat,
   labs(y = "Count", x = "Belief")
 
 ```
+
 ```{r warning = FALSE, message=FALSE, echo=TRUE}
 # Univariate Boxplots of Continuous Variables
 
@@ -231,10 +233,12 @@ dat_no_NA[abs(scale(dat_no_NA$Amount)) > 3.29, ]
 ```{r}
 # Step needs to be conducted sequentially as shown below (can be expanded with larger datasets)
 dat.no.uni1 <- dat_no_NA[!abs(scale(dat_no_NA$Belief)) > 3.29, ]
-dat.no.uni2 <- dat.no.uni1[!abs(scale(dat.no.uni1$Need)) > 3.29, ]
-dat.no.uni3 <- dat.no.uni2[!abs(scale(dat.no.uni2$Interest)) > 3.29, ]
-dat.no.uni4 <- dat.no.uni3[!abs(scale(dat.no.uni3$Happy)) > 3.29, ]
-dat_no_NA_UNI <- dat.no.uni4[!abs(scale(dat.no.uni4$Amount)) > 3.29, ]
+# dat.no.uni2 <- dat.no.uni1[!abs(scale(dat.no.uni1$Need)) > 3.29, ]
+# dat.no.uni3 <- dat.no.uni2[!abs(scale(dat.no.uni2$Interest)) > 3.29, ]
+# dat.no.uni4 <- dat.no.uni3[!abs(scale(dat.no.uni3$Happy)) > 3.29, ]
+# dat_no_NA_UNI <- dat.no.uni4[!abs(scale(dat.no.uni4$Amount)) > 3.29, ]
+
+dat_no_NA_UNI <- dat.no.uni1
 
 ```
 
@@ -312,28 +316,28 @@ rm(dat.no.uni1,
 ```{r}
 # Mardia's Test of Multivariate Normality
 mardia <- mvn(dat_final[2:6],
-              mvnTest = "mardia",
+              mvn_test = "mardia",
               desc = FALSE)
 
 # Henze-Zirkler's Test of Multivariate Normality
 hz <- mvn(dat_final[2:6],
-          mvnTest = "hz",
+          mvn_test = "hz",
           desc = FALSE)
 
 # Energy Test of Multivariate Normality
 energy <- mvn(dat_final[2:6],
-              mvnTest = "energy",
+              mvn_test = "energy",
               desc = FALSE)
 
 # Doornik-Hansen's Test of Multivariate Normality
 dh <- mvn(dat_final[2:6],
-          mvnTest = "dh",
+          mvn_test = "doornik_hansen",
           desc = FALSE)
 
-mardia$multivariateNormality
-hz$multivariateNormality
-energy$multivariateNormality
-dh$multivariateNormality
+mardia$multivariate_normality
+hz$multivariate_normality
+energy$multivariate_normality
+dh$multivariate_normality
 
 ```
 
@@ -343,8 +347,8 @@ dh$multivariateNormality
 bplm<-lm(Amount~Belief+Need+Interest+Happy, data = dat_final[2:6])
 
 #Breusch-Pagan test 
-bptest(bplm, studentize=FALSE)
-bptest(bplm, studentize=TRUE)
+bptest(bplm, varformula = ~Belief+Need+Interest+Happy, data=dat_final[2:6],studentize=FALSE)
+bptest(bplm,varformula = ~Belief+Need+Interest+Happy, data=dat_final[2:6], studentize=TRUE)
 
 ```
 
@@ -362,16 +366,21 @@ collin <- linReg(data = dat_final,
                  collin = TRUE)
 collin
 
+corrMatrix(dat_final[2:6],
+           ci = TRUE)
+```
+```{r}
+
+corrMatrix(dat_final[2:6],
+           ci = TRUE,
+           plots = TRUE,
+           plotDens = TRUE,
+           plotStats = TRUE)$plot
 ```
 
 
 #### **Multiple Regression Cleaned vs. Uncleaned Data**
 ```{r}
-corrMatrix(dat_final[2:6],
-           ci = TRUE,
-           plots = TRUE,
-           plotDens = TRUE,
-           plotStats = TRUE)
 
 # Multiple regression not clean
 linReg(data = dat,
@@ -421,14 +430,17 @@ zlm2 <- lm(scale(Amount) ~ scale(Belief) + scale(Need), data = dat_final)
 
 #Call for standardized MR coefficients/summary
 summary(zlm2)
+summary(lm2)
 
 #Call for standardized MR confidence intervals
 confint(zlm2)
+confint(lm2)
 ```
 **Direct Model Comparison**
 ```{r}
 #Model Comparison
 anova(lm1, lm2)
+anova(zlm1, zlm2)
 ```
 
 #### **Run and Visualize Final Model**
@@ -443,6 +455,17 @@ linReg(data = dat_final,
        stdEst = TRUE,
        ciStdEst = TRUE)
 ```
+
+```{r}
+set.seed(13)
+apa.reg.boot.table(lm2,
+                   number.samples = 1000)
+
+apa.cor.table(dat_final[2:6])
+```
+
+
+
 ```{r}
 # create predicted values from three predictors and save in object
 dat_final$predictedF <- fitted(lm2)
@@ -459,18 +482,26 @@ ggplot(data = dat_final,
 
 **Checking residual plots**
 ```{r}
-modelF <- linReg(data = dat_final, 
-                 dep = Amount, 
-                 covs = vars(Belief,Need),
-                 blocks = list(list('Belief','Need')), 
-                 modelTest = FALSE,
-                 r=FALSE,
-                 r2=FALSE,
-                 resPlots=TRUE)
-modelF
+linReg(data = dat_final, 
+       dep = Amount, 
+       covs = vars(Belief,Need),
+       blocks = list(list('Belief','Need')), 
+       modelTest = FALSE,
+       r=FALSE,
+       r2=FALSE,
+       resPlots=TRUE)
+
+ggplot(data = dat_final,
+       mapping = aes(x = predictedF, y = residuals)) +
+  geom_smooth(method = "lm", formula = y ~ x, se = FALSE) +
+  geom_point() +
+  labs(x = "Predicted DV", y = "Residuals")
+
 
 ggplot(data = dat_final,
        mapping = aes(x = residuals)) +
-  geom_histogram()
+  geom_histogram(bins = 12, color = "goldenrod3")
+
+describe(dat_final$residuals)
 ```
 
