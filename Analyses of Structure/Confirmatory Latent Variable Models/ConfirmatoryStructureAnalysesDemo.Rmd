@@ -1,6 +1,6 @@
 ---
 title: "Confirmatory Structure Analysis Demonstration"
-author: "Professor Christopher S. Schmank"
+author: "Christopher J. Schmank, PhD"
 date: "`r Sys.Date()`"
 output: html_document
 ---
