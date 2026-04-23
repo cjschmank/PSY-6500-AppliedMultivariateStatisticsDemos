@@ -1,6 +1,6 @@
 ---
 title: "Factorial ANOVA Demo"
-author: "Professor Christopher J. Schmank"
+author: "Christopher J. Schmank, PhD"
 date: "`r Sys.Date()`"
 output: html_document
 ---
@@ -17,13 +17,14 @@ Participants consented to be in their study after setting up their first date us
 
 The research question was: Does first-date satisfaction differ interactively when considering dating attire and the mobile application used?
 
-#### Factorial ANOVA | Data
+#### 3 x 2 Factorial ANOVA | Data
 
 ```{r message = FALSE, warning = FALSE}
 library(psych)
 library(tidyverse)
 library(jmv)
 library(ggpubr)
+library(ggrain)
 library(apaTables)
 library(ez)
 library(rstatix)
@@ -53,19 +54,6 @@ describeBy(dat_date$Satisfaction,
 
 #### Factorial ANOVA | Histogram
 
-```{r }
-library(ggplot2)
-ggplot(data = dat_date,
-       mapping = aes(x = Satisfaction)) +
-  geom_histogram(bins = 8, color = "steelblue") +
-  labs(y = "Count", x = "Satisfaction")+
-  facet_wrap(~dat_date$Outfit+dat_date$Application)
-
-```
-
-
-#### Factorial ANOVA | Histogram
-
 ```{r}
 
 ggplot(data = dat_date,
@@ -76,8 +64,28 @@ ggplot(data = dat_date,
 
 ```
 
+```{r}
 
-#### Factorial ANOVA | Boxplot
+ggplot(data = dat_date,
+       mapping = aes(x = Satisfaction)) +
+  geom_histogram(bins = 8, color = "steelblue") +
+  labs(y = "Count", x = "Satisfaction")+
+  facet_wrap(dat_date$Outfit,ncol=1)
+
+```
+
+```{r}
+
+ggplot(data = dat_date,
+       mapping = aes(x = Satisfaction)) +
+  geom_histogram(bins = 9, color = "steelblue") +
+  labs(y = "Count",
+       x = "Satisfaction")+
+  facet_wrap(~dat_date$Outfit+dat_date$Application,ncol = 2)
+
+```
+
+#### Factorial ANOVA | Boxplots and Raincloud Visualizations
 
 ```{r}
 
@@ -87,10 +95,7 @@ ggplot(data = dat_date,
     labs(y = "Date Satisfaction")
 ```
 
-
-#### Factorial ANOVA | Boxplot
-
-```{r }
+```{r}
 
 ggplot(data = dat_date,
        mapping = aes(y = Satisfaction, x = Application)) +
@@ -99,48 +104,40 @@ ggplot(data = dat_date,
 
 ```
 
-
-#### Factorial ANOVA | Violin Plot
-
 ```{r}
 
 ggplot(data = dat_date,
-       aes(x = Application, y = Satisfaction, 
-           fill = Application))+
-  geom_violin(show.legend=FALSE)+
-  ylab("Date Satisfaction")+
-  xlab("Application")+
-  scale_fill_manual(values=c("#D55e00","#56B4E9","#009E73"))
+       mapping = aes(y = Satisfaction, x = Outfit)) +
+  geom_boxplot() +
+  facet_wrap(~Application)+
+    labs(y = "Date Satisfaction")
 
 ```
 
 ```{r}
 
 ggplot(data = dat_date,
-       aes(x = Outfit, y = Satisfaction, 
-           fill = Outfit))+
-  geom_violin(show.legend=FALSE)+
-  ylab("Date Satisfaction")+
-  xlab("Outfit")+
-  scale_fill_manual(values=c("#D55e00","#56B4E9","#009E73"))
+       mapping = aes(y = Satisfaction, x = Application)) +
+  geom_boxplot() +
+  facet_wrap(~Outfit) +
+    labs(y = "Date Satisfaction")
 
 ```
 
-
-#### Factorial ANOVA | Violin Plot
-
 ```{r}
-
 ggplot(data = dat_date,
        aes(x = Outfit, y = Satisfaction, 
            fill = Application))+
-  geom_violin(show.legend=TRUE)+
+  geom_rain(show.legend=FALSE) +
+  facet_wrap(~Application)+
+  scale_colour_grey(aesthetics = "fill",
+                    start = .6,
+                    end = 1) +
+  coord_flip() +
   ylab("Date Satisfaction")+
   xlab("Outfit")+
-  scale_fill_manual(values=c("#D55e00","#56B4E9","#009E73"))
-
+  theme_classic()
 ```
-
 
 #### Factorial ANOVA | ANOVA() Omnibus Assumption Checks
 
@@ -176,17 +173,6 @@ ggqqplot(dat_date,
 
 ```
 
-#### Factorial ANOVA | Group Level Assumption Checks
-
-```{r}
-# If you have not already turned your variables into factors you need to do so before this step!
-
-dat_date %>%   
-  levene_test(Satisfaction ~ Application*Outfit, 
-              center = mean) 
-
-```
-
 #### Factorial ANOVA | Conducting the ANOVA
 
 ```{r}
@@ -195,12 +181,12 @@ ANOVA(data = dat_date,
       dep = 'Satisfaction',               
       factors = list('Application','Outfit'),  
       effectSize = 'partEta',             
-      postHoc = ~Outfit + Application:Outfit, 
+      postHoc = ~Outfit + Outfit:Application, 
       postHocCorr = 'bonf',
       postHocES = 'd',   
       postHocEsCi = TRUE,
-      emMeans = ~Application + Outfit + Application:Outfit,         
-      emmPlots = TRUE,
+      emMeans = ~Application + Outfit + Outfit:Application,         
+      emmPlots = FALSE,
       emmPlotData = TRUE,
       emmTables = TRUE)                   
 
@@ -217,64 +203,49 @@ one.way <- dat_date %>%
   anova_test(dv = Satisfaction,         
              between = Application,
              error = model)%>%  
-  get_anova_table() %>%                 
-  adjust_pvalue(method = "bonferroni")  
+  get_anova_table() 
 one.way 
 
-one.way2 <- dat_date %>%                 
-  group_by(Application) %>%                  
-  anova_test(dv = Satisfaction,         
+one.way2 <- dat_date %>%
+  group_by(Application) %>%
+  anova_test(dv = Satisfaction,
              between = Outfit,
-             error = model)%>%  
-  get_anova_table() %>%                 
-  adjust_pvalue(method = "bonferroni")  
+             error = model)%>%
+  get_anova_table()
 one.way2
 
 ```
 
-The simple main effect of Outfit on date satisfaction was statistically significant for both OKCupid and Tinder users (*p* < .001). In other words, there was a statistically significant difference in mean date satisfaction scores between OKCupid users based on date attire [*F*(2,114) = 37.07, *p* < .001]. And the same conclusion holds true for Tinder users [*F*(2,114) = 33.07, *p* < .001].
+The simple main effect of Outfit on date satisfaction was statistically significant for both OKCupid and Tinder users (*p* < .001). In other words, there was a statistically significant difference in mean date satisfaction scores between OKCupid users based on date attire [*F*(2,114) = 37.07, *p* < .001]. And the same conclusion holds true for Tinder users [*F*(2,114) = 33.07, *p* < .001]. We would need to do further post-hoc testing to figure out where the differences occur.  
+
+**BUT** this is not as informative as looking at the simple main effects of Application on date satisfaction for Athletic, Dressed Up, and Leisure Wear conditions. There was no statistically significant difference between applications when participants wore leisure wear [*F*(1,114) = 0.19, *p* > .05]. But significant differences arose across applications for those wearing Athletic Wear [*F*(1,114) = 30.11, *p* < .001, $\eta_p^2$ = .21) and those that Dressed Up [*F*(1,114) = 35.05, *p* < .001, $\eta_p^2$ = .24]. 
 
 #### Factorial ANOVA | Professional ANOVA Visualization Code
 
 ```{r}
 
-# Generates Marginal Means for Visualization
-pwc <- dat_date %>%
+pwc1 <- dat_date %>%
   group_by(Application) %>%                               
   emmeans_test(Satisfaction~Outfit,                 
                p.adjust.method = "bonferroni") %>%   
-  add_xy_position(x = "Application")                      
-
-pwc
-
-pwc2 <- dat_date %>%
-  group_by(Outfit) %>%                               
-  emmeans_test(Satisfaction~Application,                 
-               p.adjust.method = "bonferroni") %>%   
-  add_xy_position(x = "Outfit")                      
-
-pwc2
-
-```
-
-There were statistically significant differences in date satisfaction between all groups for both OKCupid and Tinder users (*p*s < .05 when adjusted using Bonferroni correction).
-
-#### Factorial ANOVA | Professional ANOVA Visualization Code
-
-```{r}
+  add_xy_position(x = "Application") 
 
 ggboxplot(dat_date,                            
           x = "Application",                       
           y = "Satisfaction",                 
           color = "Outfit") +               
-  stat_pvalue_manual(pwc,                     
+  stat_pvalue_manual(pwc1,                     
                      hide.ns = FALSE,
                      tip.length = 0) +       
-  labs(                                       
-    caption = get_pwc_label(pwc),            
-    y = "Date Satisfaction",
-    x = "Application Used")
-
+  labs(y = "Date Satisfaction",
+       x = "Application Used")
+```
+```{r}
+pwc2 <- dat_date %>%
+  group_by(Outfit) %>%
+  emmeans_test(Satisfaction~Application,
+               p.adjust.method = "bonferroni") %>%
+  add_xy_position(x = "Outfit")
 
 ggboxplot(dat_date,                            
           x = "Outfit",                       
@@ -289,33 +260,18 @@ ggboxplot(dat_date,
     x = "Outfit Worn")
 ```
 
-#### Factorial ANOVA | Saving the ANOVA Model Object
-
-```{r}
-
-aovm3<-ANOVA(data = dat_date,                    
-      dep = 'Satisfaction',               
-      factors = list('Application','Outfit'),  
-      effectSize = 'partEta',             
-      postHoc = ~Outfit, 
-      postHocCorr = 'bonf',
-      postHocES = 'd',   
-      postHocEsCi = TRUE,
-      emMeans = ~Application + Outfit + Application:Outfit,         
-      emmPlots = TRUE,
-      emmPlotData = TRUE,
-      emmTables = TRUE)$model
-
-```
-
 #### Factorial ANOVA | APA Style ANOVA Tables
 
 ```{r}
+# ANOVA Source Table
+aovm3<-ANOVA(data = dat_date,
+             dep = 'Satisfaction',
+             factors = list('Application','Outfit'),
+             effectSize = 'partEta')$model
 
 apa.aov.table(aovm3,
               table.number=5,
-              conf.level=.95,
-              filename = "FactorialANOVA.doc")
+              conf.level=.95)
 
 #Generate Marginal Means Table
 apa.2way.table(Outfit,
