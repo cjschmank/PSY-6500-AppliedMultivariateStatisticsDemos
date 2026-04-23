@@ -1,6 +1,6 @@
 ---
 title: "Principal Components and Exploratory Factor Analysis Tutorial"
-author: "Professor Christopher J. Schmank"
+author: "Christopher J. Schmank, PhD"
 date: "`r Sys.Date()`"
 output: html_document
 ---
@@ -16,6 +16,7 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(jmv)
 library(psych)
+library(GPArotation)
 library(EGAnet)
 
 ```
@@ -74,7 +75,7 @@ wisc_dat <- wisc_data[,-c(1,2)]
 head(wisc_dat)
 
 # OR can call only the variables to retain
-# wisc_dat <- wisc_data[3:13]
+wisc_dat <- wisc_data[3:13]
 
 ```
 
@@ -97,6 +98,9 @@ corrMatrix(wisc_dat,
            plots = TRUE, 
            plotDens = TRUE,
            plotStats = TRUE)$plot
+
+# Always visualize your correlation matrix object in case of NAs
+wisc_corr
 ```
 
 ---
@@ -114,6 +118,9 @@ This initial assumption test is to make sure that the correlations in our matrix
 
 cortest.bartlett(wisc_cor, n = 175)
 
+cortest.bartlett(wisc_dat)
+
+# Null hypothesis is that the data is an identity matrix!
 ```
 
 OK, so *p* is VERY small (*p* < .001), so we can be confident that our sample correlation matrix is statistically significantly different from an identity matrix--i.e., correlations are substantial enough for factorization. 
@@ -126,7 +133,7 @@ $\text{Sampling Moments} = [\text{Number of Variables} * (\text{Number of Variab
 
 $(11 * 12) / 2 = 66 \text{ Sampling Moments}$
 
-From these 66 `sampling moments` we subtract the number of variables we estimate correlations for (i.e., 11 variables in `wisc_dat`) and end up with our Bartlett's *df* of 55---also the number of correlations in a matrix with 11 variables! This is a good sanity check to make sure you are including the correct number of variables in your analyses before you get to the PCA or EFA sections!
+From these 66 `sampling moments` we subtract the number of variables we estimate correlations for (i.e., 11 variables in `wisc_dat`) and end up with our Bartlett's *df* of 55---also the number of correlations in a matrix with 11 variables! **This is a good sanity check to make sure you are including the correct number of variables in your analyses before you get to the PCA or EFA sections!**
 
 ---
 
@@ -145,11 +152,12 @@ KMO(wisc_cor)
 For factor analysis it is desirable that each factor (or component) be measured by at least three items. A larger KMO is desirable, with 1.00 the maximum possible. Values between .80-.89 are viewed as ‘meritorious’ and greater than .90 as ‘marvelous.’ 
 
 **Metrics Used to Assess KMO Values**
-```{r echo=FALSE, fig.align='center', out.width="75%",message=FALSE,warning=FALSE}
-knitr::include_graphics("KMOMetrics.png")
-```
 
 If all variables are independent, KMO = .50. `MSA for each item` is a ‘Measure of Sampling Adequacy’ for each item relative to the other items in the data set. If an item has at least two ‘friends’ with mutually high correlations, MSA is large. Here we see that the overall MSA (i.e., KMO) looks ‘meritorious’ and all items have good MSA values except for `coding` which doesn’t have at least two good friends. We will address this later.
+
+```{r echo=FALSE, fig.align='center', out.width="50%",message=FALSE,warning=FALSE}
+knitr::include_graphics("Figures/KMOMetrics.png")
+```
 
 ---
 
@@ -195,15 +203,24 @@ fa.parallel(wisc_cor,
             show.legend=TRUE, 
             main="Scree plot with parallel analysis")
 
+fa.parallel(wisc_cor, 
+            n.obs = 175,
+            fa="both",
+            fm="gls",
+            n.iter=500, 
+            error.bars=TRUE,
+            show.legend=TRUE, 
+            main="Scree plot with parallel analysis")
+
 # Optional Code: fa.parallel() using raw data
 
-# fa.parallel(wisc_dat,
-#             fa="both",
-#             fm="ml",
-#             n.iter=500, 
-#             error.bars=TRUE,
-#             show.legend=TRUE, 
-#             main="Scree plot with parallel analysis")
+fa.parallel(wisc_dat,
+            fa="both",
+            fm="ml",
+            n.iter=500,
+            error.bars=TRUE,
+            show.legend=TRUE,
+            main="Scree plot with parallel analysis")
 
 ```
 
@@ -244,9 +261,10 @@ wisc_pca <- principal(wisc_dat,
                       nfactors = 11, 
                       rotate = "none")
 
-print.psych(wisc_pca, cut=.3,sort = TRUE)
+print.psych(wisc_pca, sort = TRUE)
+# print.psych(wisc_pca, cut=.3,sort = TRUE)
 
-# Before parallel analysis we could use the SS loadings (i.e., Eigenvalues) to assess the number of components that should be extracted--based on Kaiser cutoff values of 1.00 for Eigenvalues we could have 3 components based on this correlation matrix
+# Before parallel analysis we could use the SS loadings (i.e., Eigenvalues) to assess the number of components that should be extracted--based on Kaiser cutoff values of 1.00 for Eigenvalues we could have 3 components based on this correlation matrix NOT 2
 
 ```
 
@@ -314,7 +332,7 @@ print.psych(wisc_pca3, cut = .3, sort = TRUE)
 print.psych(wisc_pca3V, cut = .3, sort = TRUE)
 ```
 
-Now the *h^2^* communality values are more "interesting" when we extract FEWER components than items (not all 1). For instance, 37% of the variance in `parang`is captured by the three components (meaning 63% is left unaccounted for!). But if we look at the factor loadings for `parang` in the rotated model, we have a much easier time determining which factor explains it. **Remember**: This is just an artifact of running PCA with fewer components than variables, PCA ALWAYS ACCOUNTS FOR 100% OF THE VARIANCE! 
+Now the *h^2^* communality values are more "interesting" when we extract FEWER components than items (not all 11). For instance, 37% of the variance in `parang`is captured by the three components (meaning 63% is left unaccounted for!). But if we look at the factor loadings for `parang` in the rotated model, we have a much easier time determining which component explains it. **Remember**: This is just an artifact of running PCA with fewer components than variables, PCA ALWAYS ACCOUNTS FOR 100% OF THE VARIANCE! 
 
 Can also see that the majority of the variance in the `coding` variable has been accounted for by a single component--79% of the variance. When we take a look at the loadings for each component, `coding` has a loading of .88 on the third component (RC3), but it is the only variable with a loading greater than .43 on that component. 
 
@@ -345,7 +363,7 @@ wisc_cor2 <- cor(wisc_dat_2)
 # 7. show.legend = TRUE or FALSE (Do you need a legend?)
 # 8. main = Title of plot
 fa.parallel(wisc_dat_2, 
-            fa="both",
+            fa="pc",
             fm="ml",
             n.iter=500, 
             error.bars=TRUE,
@@ -375,8 +393,8 @@ Let’s start with looking at the finalized 10 variable data set assuming the 2 
 wisc_fa <- fa(wisc_dat_2, 
               nfactors = 2,
               fm = "ml")
+print.psych(wisc_fa, sort = TRUE)
 
-print.psych(wisc_fa, cut = .3, sort = TRUE)
 
 # Alternative for using correlation matrix as input
 
@@ -387,6 +405,11 @@ print.psych(wisc_fa, cut = .3, sort = TRUE)
 
 # print.psych(wisc_fa2, cut = .3, sort = TRUE)
 ```
+
+```{r}
+print.psych(wisc_fa, cut = .3, sort = TRUE)
+```
+
 
 ```{r FAB}
 
@@ -445,9 +468,9 @@ resid3 <- wisc_cor_actual-wisc_cor_reproducedC
 # Or we can use the `factor.residuals()` function from the `psych` package
 # This function requires the actual correlation matrix and the factor/component loadings from your "best" factor model
 
-fresid1 <- factor.residuals(wisc_cor_actual, wisc_fa$loadings)
-fresid2 <- factor.residuals(wisc_cor_actual, wisc_faB$loadings)
-fresid3 <- factor.residuals(wisc_cor_actual, wisc_faC$loadings)
+# fresid1 <- factor.residuals(wisc_cor_actual, wisc_fa$loadings)
+# fresid2 <- factor.residuals(wisc_cor_actual, wisc_faB$loadings)
+# fresid3 <- factor.residuals(wisc_cor_actual, wisc_faC$loadings)
 
 # Can uncomment these lines of code below to ensure that the SAME data is present across either residual calculation above---resulting output/matrix should contain only zeros.
 # resid1 - fresid1
@@ -465,17 +488,23 @@ Now, let's calculate how many residuals are greater than +/- 0.05 for each of ou
 # To extract the values from one half of our residual correlation matrix object we use the following code
 
 # ML Extraction
-resid1_upper <- as.matrix(fresid1[upper.tri(fresid1)])
+resid1_upper <- as.matrix(resid1[upper.tri(resid1)])
 resid1_upper
+mean(resid1_upper)
+```
 
+```{r}
 # PAF Extraction
-resid2_upper <- as.matrix(fresid2[upper.tri(fresid2)])
+resid2_upper <- as.matrix(resid2[upper.tri(resid2)])
 resid2_upper
+mean(resid2_upper)
+```
 
+```{r}
 # GLS Extraction
-resid3_upper <- as.matrix(fresid3[upper.tri(fresid3)])
+resid3_upper <- as.matrix(resid3[upper.tri(resid3)])
 resid3_upper
-
+mean(resid3_upper)
 ```
 
 **Step 2**: Assess absolute value of each residual against 0.05 and sum to assess number of residuals greater than 0.05:
@@ -534,8 +563,6 @@ ggplot(aes(x = V1)) +
 The plot of the residuals is not great. Some of the residuals are in the -.1 to .3 range, however, the majority of the residuals are greater than .05.
 
 
-## Something new that uses exploratory graph analysis--a complimentary alternative to exploratory factor analysis
-
 ```{r}
 # Best Model == GLS Model
 fa.diagram(wisc_faC, 
@@ -556,5 +583,12 @@ fa.diagram(wisc_fa,
            sort = TRUE)
 ```
 
+```{r}
+EGA(wisc_dat_2)
+groups <- list(Verbal = c(1:6), Performance = c(7:10))
+network <- qgraph::EBICglasso(wisc_cor2, n = 175)
+qgraph::qgraph(network, layout = "circle", groups = groups, palette= "colorblind")
+qgraph::qgraph(network, layout = "spring", groups = groups, theme= "gray")
+```
 
 
