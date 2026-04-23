@@ -1,6 +1,6 @@
 ---
 title: "Analysis of Covariance Tutorials: One-way and Factorial Analyses"
-author: "Professor Christopher J. Schmank"
+author: "Christopher J. Schmank, PhD"
 date: "`r Sys.Date()`"
 output: html_document
 ---
@@ -15,6 +15,7 @@ library(psych)
 library(tidyverse)
 library(jmv)
 library(ggpubr)
+library(ggrain)
 library(apaTables)
 library(ez)
 library(rstatix)
@@ -86,23 +87,31 @@ ggplot(data = dat_anx,
 ```
 
 ```{r}
-# Violin Plots
+# Raincloud Plots
 
 ggplot(data = dat_anx,
-       aes(x = groupF, y = pretest, 
+       aes(x = groupF, y = pretest,
            fill = groupF))+
-  geom_violin(show.legend=FALSE)+
-  ylab("Baseline Anxiety")+
-  xlab("Exercise Group")+
-  scale_fill_manual(values=c("#D55e00","#56B4E9","#009E73"))
+  geom_rain(show.legend=FALSE) +
+  scale_colour_grey(aesthetics = "fill",
+                    start = .6,
+                    end = 1) +
+  coord_flip() +
+  ylab("Pre-test Score")+
+  xlab("Physical Exercise Group")+
+  theme_classic()
 
 ggplot(data = dat_anx,
-       aes(x = groupF, y = posttest, 
+       aes(x = groupF, y = posttest,
            fill = groupF))+
-  geom_violin(show.legend=FALSE)+
-  ylab("Post-treatment Anxiety")+
-  xlab("Exercise Group")+
-  scale_fill_manual(values=c("#D55e00","#56B4E9","#009E73"))
+  geom_rain(show.legend=FALSE) +
+  scale_colour_grey(aesthetics = "fill",
+                    start = .6,
+                    end = 1) +
+  coord_flip() +
+  ylab("Post-test Score")+
+  xlab("Physical Exercise Group")+
+  theme_classic()
 ```
 
 ## ANCOVA | Omnibus Assumption Check 
@@ -181,18 +190,18 @@ ancova(data = dat_anx,
        emMeans=list(
           list('groupF')),  
        emmTables=TRUE,        
-       emmPlots=TRUE)         
+       emmPlots=FALSE)         
 ``` 
 
 ## ANCOVA | Professional ANCOVA Visualization
 
 ```{r}
 
-res.aov<- dat_anx %>% 
-  anova_test(dv = posttest,
-             between= group,
-             covariate = pretest,
-             effect.size = 'ges')
+# res.aov<- dat_anx %>% 
+#   anova_test(dv = posttest,
+#              between= group,
+#              covariate = pretest,
+#              effect.size = 'ges')
 
 # Generates Marginal Means for Visualization
 pwc <- dat_anx %>% 
@@ -218,9 +227,7 @@ ggline(get_emmeans(pwc),
                      hide.ns = TRUE,             
                      tip.length = FALSE) +       
   ylab("Mean Post-Test Anxiety") +               
-  xlab("Group") +                                
-  labs(caption = get_pwc_label(pwc)                 
-  )
+  xlab("Group") 
 
 ```
 
@@ -284,14 +291,32 @@ ggplot(data = dat_stress,
     labs(y = "Stress Score")
 
 # Violin Plot
-ggplot(data = dat_stress,
-       aes(x = Exercise, y = score, 
-           fill = Treatment))+
-  geom_violin(show.legend=TRUE)+
-  ylab("Stress Score")+
-  xlab("Exercise Type")+
-  scale_fill_manual(values=c("#D55e00","#56B4E9","#009E73"))
 
+ggplot(data = dat_stress,
+       aes(x = Treatment, y = score,
+           fill = Exercise))+
+  geom_rain(show.legend=FALSE) +
+  facet_wrap(~Exercise)+
+  scale_colour_grey(aesthetics = "fill",
+                    start = .6,
+                    end = 1) +
+  coord_flip() +
+  ylab("Post-test Score")+
+  xlab("Physical Exercise Group")+
+  theme_classic()
+
+ggplot(data = dat_stress,
+       aes(x = Exercise, y = score,
+           fill = Treatment))+
+  geom_rain(show.legend=FALSE) +
+  facet_wrap(~Treatment)+
+  scale_colour_grey(aesthetics = "fill",
+                    start = .6,
+                    end = 1) +
+  coord_flip() +
+  ylab("Post-test Score")+
+  xlab("Physical Exercise Group")+
+  theme_classic()
 ```
 
 
@@ -370,7 +395,7 @@ pwc <- dat_stress %>%
   emmeans_test(score ~ Treatment,
                covariate = age,
                p.adjust.method = "bonferroni")
-
+pwc
 pwc %>% filter(Exercise == "High") 
 
 pwc2 <- dat_stress %>% 
@@ -378,7 +403,7 @@ pwc2 <- dat_stress %>%
   emmeans_test(score ~ Exercise,
                covariate = age,
                p.adjust.method = "bonferroni")
-
+pwc2
 pwc2 %>% filter(Treatment == "Protein Treatment")
 
 ```
@@ -387,6 +412,17 @@ pwc2 %>% filter(Treatment == "Protein Treatment")
 
 lp <- ggline(
   get_emmeans(pwc),
+  x = "Exercise",
+  y = "emmean",
+  color = "Treatment",
+  palette = "grey") +
+  geom_errorbar(
+    aes(ymin = conf.low,
+        ymax = conf.high),
+    width = 0.1) 
+
+lp2 <- ggline(
+  get_emmeans(pwc2),
   x = "Exercise",
   y = "emmean",
   color = "Treatment",
@@ -411,8 +447,7 @@ lp + stat_pvalue_manual(pwc,
   labs(
     y = "Estimated Means",
     x = "Exercise Condition",
-    color = "Treatment",
-    caption = get_pwc_label(pwc)
+    color = "Treatment"
   )
 ```
 
@@ -423,13 +458,12 @@ pwc2 <- pwc2 %>% add_xy_position(x = "Exercise",
 pwc2.filtered <- pwc2 %>% filter(Treatment == "Protein Treatment")
 
 
-lp + stat_pvalue_manual(pwc2,
-                     hide.ns = TRUE,
-                     tip.length = 0) +
+lp2 + stat_pvalue_manual(pwc2,
+                         hide.ns = TRUE,
+                         tip.length = 0) +
   labs(
     y = "Estimated Means",
     x = "Exercise Condition",
-    color = "Treatment",
-    caption = get_pwc_label(pwc)
+    color = "Treatment"
   )
 ```

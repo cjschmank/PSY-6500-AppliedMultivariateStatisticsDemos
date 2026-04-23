@@ -1,6 +1,6 @@
 ---
 title: "One-Way Between-Subjects ANOVA Demo"
-author: "Professor Christopher J. Schmank"
+author: "Christopher J. Schmank, PhD"
 date: "`r Sys.Date()`"
 output: html_document
 ---
@@ -20,6 +20,7 @@ Data on 90 teenagers self-esteem levels and the parenting style they experienced
 ```{r message = FALSE, warning = FALSE}
 library(psych)
 library(tidyverse)
+library(ggrain)
 library(jmv)
 library(ggpubr)
 library(apaTables)
@@ -56,7 +57,7 @@ describeBy(dat_A$Self_esteem,
 
 ### One-way Between-Subjects ANOVA | Univariate Visualizations
 
-#### One-way Between-Subjects ANOVA | Boxplot
+#### One-way Between-Subjects ANOVA | Grouped Boxplot
 
 ```{r}
 
@@ -67,25 +68,31 @@ ggplot(data = dat_A,
 
 ```
 
-#### One-way Between-Subjects ANOVA | Violin Plot
+#### One-way Between-Subjects ANOVA | Raincloud Plot
 
 ```{r}
-
 ggplot(data = dat_A,
        aes(x = Style, y = Self_esteem, 
            fill = Style))+
-  geom_violin(show.legend=FALSE)+
-  ylab("Self-Esteem")+
-  xlab("Parenting Style")
-
-ggplot(data = dat_A,
-       aes(x = Style, y = Self_esteem, 
-           fill = Style))+
-  geom_violin(show.legend=FALSE)+
+  geom_rain(show.legend=FALSE) +
+  scale_colour_grey(aesthetics = "fill",
+                    start = .6,
+                    end = 1) +
+  coord_flip() +
   ylab("Self-Esteem")+
   xlab("Parenting Style")+
-  scale_fill_manual(values=c("#D55e00","#56B4E9","#009E73"))
+  theme_classic()
 
+
+ggplot(data = dat_A,
+       aes(x = Style, y = Self_esteem, 
+           fill = Style))+
+  geom_rain(show.legend=FALSE) +
+  coord_flip() +
+  ylab("Self-Esteem")+
+  xlab("Parenting Style")+
+  scale_fill_manual(values=c("#D55e00","#56B4E9","#009E73"))+
+  theme_classic()
 ```
 
 #### One-way Between-Subjects ANOVA | Omnibus Assumption Checks Code
@@ -145,12 +152,14 @@ ANOVA(data = dat_A,
       postHocEsCi = TRUE,
       emMeans = list(
        list('Style')),
-      emmPlots = TRUE,
+      emmPlots = FALSE,
       emmTables = TRUE)
 
 ```
 
-#### One-way Between-Subjects ANOVA | Professional ANOVA Visualization Code
+### One-way Between-Subjects ANOVA | Professional ANOVA Visualization Code
+
+#### One-way Between-Subjects ANOVA | Boxplot Visualization w/ Significance Indicators Code
 
 ```{r}
 
@@ -159,53 +168,28 @@ pwc <- dat_A %>%
   pairwise_t_test(Self_esteem ~ Style, p.adjust.method = "bonferroni") %>% 
   add_xy_position(x = "Style")
 
-```
-
-#### One-way Between-Subjects ANOVA | Professional ANOVA Visualization Code
-
-```{r}
-
 # Visualization: box plots with p-values
+
 ggboxplot(dat_A, 
           x = "Style", 
           y = "Self_esteem", 
-          notch = TRUE, 
+          #notch = TRUE, 
           outlier.shape = NA) +
   stat_pvalue_manual(pwc, 
                      hide.ns = TRUE, 
-                     tip.length = .01) +
-  labs(caption = get_pwc_label(pwc),
-       y = "Self Esteem")
-
-```
-
-#### One-way Between-Subjects ANOVA | Saving the ANOVA Model
-
-```{r}
-
-aovm<-ANOVA(data = dat_A, 
-            dep = 'Self_esteem', 
-            factors = c('Style'), 
-            effectSize = 'eta', 
-            postHoc = 'Style', 
-            postHocCorr = 'bonf',
-            postHocES = 'd',
-            postHocEsCi = TRUE,
-            emMeans = list(
-              list('Style')),
-            emmPlots = TRUE,
-            emmTables = TRUE)$model
+                     tip.length = 0) +
+  labs(y = "Self Esteem")
 
 ```
 
 #### One-way Between-Subjects ANOVA | APA Style ANOVA Tables
 
 ```{r}
-
-apa.aov.table(aovm,
+lm<-lm(Self_esteem ~ Style, dat_A)
+apa.aov.table(lm,
               table.number=1,
               conf.level=.95,
-              type = 3)
+              type = 2)
 
 apa.1way.table(Style,
                Self_esteem,

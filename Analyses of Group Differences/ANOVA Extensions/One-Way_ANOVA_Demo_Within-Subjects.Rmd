@@ -1,6 +1,6 @@
 ---
 title: "One-Way Within-Subjects ANOVA Demo"
-author: "Professor Christopher J. Schmank"
+author: "Christopher J. Schmank, PhD"
 date: "`r Sys.Date()`"
 output: html_document
 ---
@@ -13,7 +13,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 A local stress researcher is interested in the relationship between psychosocial stress levels and processing speed. After conducting a brief literature review they have hypothesized that regulating feelings of stress impairs concurrent performance of processing speed.
 
-The researcher conducted a study where psychosocial stress was manipulated into three conditions: low stress, mild stress, and strong stress. Money was tight and recruitment was difficult, so they implemented a within-subjects, repeated measures design. Data was collected from 20 participants that consented to participate. The dependent measure in this task was processing speed ability measured in 10-second intervals (i.e., 1.3 = 13 seconds!!)
+The researcher conducted a study where psychosocial stress was manipulated into three conditions: low stress (**Calm**), mild stress (**Mild**), and strong stress (**Strong**). Money was tight and recruitment was difficult, so they implemented a within-subjects, repeated measures design. Data was collected from 20 participants that consented to participate. The dependent measure in this task was processing speed ability measured in 10-second intervals (i.e., 1.3 = 13 seconds!!)
 
 #### One-way Within-Subjects ANOVA | Data
 
@@ -23,6 +23,7 @@ library(psych)
 library(tidyverse)
 library(jmv)
 library(ggpubr)
+library(ggrain)
 library(apaTables)
 library(ez)
 library(rstatix)
@@ -38,43 +39,76 @@ head(dat_stress)
 ```{r}
 
 # Descriptive Stats
-describe(dat_stress[,2:4])
+describe(dat_stress[-1])
 
 ```
 
-#### One-way Within-Subjects ANOVA | Boxplot
+### One-way Within-Subjects ANOVA | Visualizations
+
+#### First we need to make the wide data into a long format
 
 ```{r}
+# Create Long Data Frame using tidyr::gather()
 
 dat_stressL<- dat_stress %>% 
-  gather(key="Stress",
-         value="Score",
+  gather(key="Stress_Condition",
+         value="Speed",
          Calm,
          Mild,
-         Strong)
+         Strong,
+         factor_key = TRUE)
 
-dat_stressL$Stress<-factor(dat_stressL$Stress,labels = c("Calm","Mild","Strong"))
+dat_stressL$ID <- factor(dat_stressL$ID)
 
+# OR you can use the tidyr::pivot_longer() function workflow
+
+dat_stressL2 <- dat_stress %>% 
+  pivot_longer(cols = -ID,
+               names_to = "Stress_Condition",
+               values_to = "Speed")
+
+dat_stressL2$Stress_Condition<-factor(dat_stressL2$Stress_Condition,labels = c("Calm","Mild","Strong"))
+
+dat_stressL2$ID <- factor(dat_stressL2$ID)
+```
+
+```{r}
+# Boxplot Visualization
 ggplot(data = dat_stressL,
-       mapping = aes(y = Score, x = Stress)) +
+       mapping = aes(y = Speed, x = Stress_Condition)) +
   geom_boxplot() +
-    labs(y = "Processing Speed (10-second Intervals)")
+  ylab("Processing Speed (10-second Intervals)") +
+  xlab("Stress Condition")
+
+# Raincloud Plot Visualization
+ggplot(data = dat_stressL,
+       aes(x = Stress_Condition, y = Speed, 
+           fill = Stress_Condition))+
+  geom_rain(show.legend=FALSE) +
+  scale_colour_grey(aesthetics = "fill",
+                    start = .6,
+                    end = 1) +
+  coord_flip() +
+  ylab("Processing Speed (10-Second Intervals)")+
+  xlab("Stress Condition")+
+  theme_classic()
 
 ```
 
-#### One-way Within-Subjects ANOVA | Omnibus Normality Check
+#### One-way Within-Subjects ANOVA | Sphericity Violation Check
 
 ```{r}
+# JMV Code does NOT require Long data frame object
 
 anovaRM(data=dat_stress,
         rm = list(
-          list(label = 'Stress',levels = list('Calm','Mild','Strong'))),
+          list(label = 'Stress Condition',
+               levels = list('Calm','Mild','Strong'))),
         rmCells = list(
           list(measure = 'Calm', cell = 'Calm'),
           list(measure = 'Mild', cell = 'Mild'),
           list(measure = 'Strong', cell = 'Strong')),
-        rmTerms= list('Stress'),
-        qq = TRUE,
+        rmTerms= list('Stress Condition'),
         spherTests = TRUE)
 
 ```
@@ -82,10 +116,15 @@ anovaRM(data=dat_stress,
 #### One-way Within-Subjects ANOVA | Normality Assumption Check
 
 ```{r}
+# ggpubr::ggqqplot() requires long data frame
+
+dat_stressL %>% 
+  group_by(Stress_Condition) %>% 
+  shapiro_test(Speed)
 
 ggqqplot(dat_stressL,
-         'Score',
-         facet.by = "Stress")
+         'Speed',
+         facet.by = "Stress_Condition")
 
 ```
 
@@ -108,37 +147,20 @@ anovaRM(data=dat_stress,
         emMeans=list(
           list('Stress')),
         emmTables=TRUE,
-        qq = TRUE,
+        emmPlots=FALSE,
         spherTests = TRUE,
         spherCorr = list('none', 'GG'))
 
 ```
-
-#### One-way Within-Subjects ANOVA | Conducting the ANOVA
-
-```{r}
-
-res <- anova_test(dat_stressL,
-                  dv=Score,
-                  wid=ID,
-                  within=Stress,
-                  effect.size = "ges",
-                  type = 3,
-                  detailed=TRUE)
-
-get_anova_table(res)
-
-```
-
 #### One-way Within-Subjects ANOVA | ANOVA Output: Manual Post-Hoc Tests Code
 
 ```{r}
 
-pair<-dat_stressL %>%
-  pairwise_t_test(Score~Stress,
+pwc <- dat_stressL %>%
+  pairwise_t_test(Speed~Stress_Condition,
                   paired=TRUE, 
                   p.adjust.method = "bonferroni") %>%
-  add_xy_position(x = "Stress")
+  add_xy_position(x = "Stress_Condition")
 
 ```
 
@@ -147,11 +169,11 @@ pair<-dat_stressL %>%
 ```{r}
 
 ggboxplot(dat_stressL, 
-          x = "Stress", 
-          y = "Score") +
-  stat_pvalue_manual(pair,
-                     hide.ns = TRUE, 
-                     tip.length = .01) +
+          x = "Stress_Condition", 
+          y = "Speed") +
+  stat_pvalue_manual(pwc,
+                     #hide.ns = TRUE, 
+                     tip.length = 0) +
   labs(y = "Processing Speed (10-second Intervals)", x = "Stress Level")
 
 ```
@@ -159,8 +181,14 @@ ggboxplot(dat_stressL,
 #### One-way Within-Subjects ANOVA | APA Style ANOVA Tables
 
 ```{r}
+model <- ezANOVA(dat_stressL,
+                 dv=.(Speed),
+                 wid=.(ID),
+                 within=.(Stress_Condition),
+                 type = 3,
+                 detailed=TRUE)
 
-apa.ezANOVA.table(res,
+apa.ezANOVA.table(model,
                   correction="none",
                   table.title = "Repeated Measure ANOVA",
                   table.number=3)

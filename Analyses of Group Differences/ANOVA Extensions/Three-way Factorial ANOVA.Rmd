@@ -1,6 +1,6 @@
 ---
 title: "Three-way Factorial Analysis of Variance Tutorial"
-author: "Professor Christopher J. Schmank"
+author: "Christopher J. Schmank, PhD."
 date: "`r Sys.Date()`"
 output: html_document
 ---
@@ -26,6 +26,7 @@ library(psych)
 library(tidyverse)
 library(jmv)
 library(ggpubr)
+library(ggrain)
 library(apaTables)
 library(ez)
 library(rstatix)
@@ -83,6 +84,22 @@ ggplot(data = dat,
   facet_wrap(c("risk", "gender"))
 
 ```
+
+```{r}
+ggplot(data = dat,
+       aes(x = drug, y = cholesterol,
+           fill = gender))+
+  geom_rain(show.legend=FALSE) +
+  facet_wrap(~risk+gender)+
+  scale_colour_grey(aesthetics = "fill",
+                    start = .6,
+                    end = 1) +
+  coord_flip() +
+  ylab("Post-test Score")+
+  xlab("Physical Exercise Group")+
+  theme_classic()
+```
+
 
 
 #### Factorial ANOVA | ANOVA() Omnibus Assumption Checks
